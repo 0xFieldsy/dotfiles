@@ -1,4 +1,30 @@
 {
+  "editor.rulers": [100],
+  "editor.unicodeHighlight.includeStrings": false, // fish prompt
+
+  "files.exclude": {
+    "__pycache__/**": true,
+    ".ruff_cache/**": true,
+    ".venv/**": true
+  },
+  "files.watcherExclude": {
+    "__pycache__/**": true,
+    ".ruff_cache/**": true,
+    ".venv/**": true
+  },
+
+  "powershell.integratedConsole.showOnStartup": false,
+  "powershell.integratedConsole.startInBackground": true,
+
+  "python.languageServer": "None",
+
+  "shellcheck.ignorePatterns": {
+    "**/*.fish": true,
+    "**/*.zsh": true
+  },
+
+  "ty.completions.autoImport": false,
+
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
@@ -12,19 +38,5 @@
     "editor.codeActionsOnSave": {
       "source.fixAll.shellcheck": "explicit"
     }
-  },
-  "editor.rulers": [100],
-  "editor.unicodeHighlight.includeStrings": false, // when editing fish prompt
-   "files.exclude": {
-    ".venv/**": true
-  },
-  "files.watcherExclude": {
-    ".venv/**": true
-  },
-  "powershell.integratedConsole.showOnStartup": false,
-  "powershell.integratedConsole.startInBackground": true,
-  "shellcheck.ignorePatterns": {
-    "**/*.fish": true,
-    "**/*.zsh": true
   }
 }
