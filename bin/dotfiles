@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import bz2
 import json
 import os
 import platform
@@ -34,12 +35,12 @@ BIN_REGISTRY = {
     "fzf": ("junegunn/fzf", lambda a: f"fzf-.+-linux_{a['misc']}\\.tar\\.gz$"),
     "gh": ("cli/cli", lambda a: f"gh_.+_linux_{a['misc']}\\.tar\\.gz"),
     "gws": ("googleworkspace/cli", lambda a: f"gws-{a['gnu']}\\.tar\\.gz$"),
-    "hcloud": ("hetznercloud/cli", lambda a: f"hcloud-linux-{a['misc']}\\.tar\\.gz"),
     "lf": ("gokcehan/lf", lambda a: f"lf-linux-{a['misc']}\\.tar\\.gz"),
     "magick": ("imagemagick/imagemagick", lambda _: r"clang-x86_64\.AppImage$"),
     "micro": ("micro-editor/micro", lambda a: f"micro-.+-{a['micro']}\\.tar\\.gz$"),
     "opencode": ("anomalyco/opencode", lambda a: f"opencode-linux-{a['node']}\\.tar\\.gz"),
     "polymarket": ("polymarket/polymarket-cli", lambda a: f"polymarket-.+-{a['gnu']}\\.tar\\.gz"),
+    "restic": ("restic/restic", lambda a: f"restic_.+_linux_{a['misc']}\\.bz2$"),
     "shellcheck": (
         "koalaman/shellcheck",
         lambda a: f"shellcheck-v.+\\.linux\\.{a['kernel']}\\.tar\\.gz$",
@@ -74,26 +75,20 @@ def _detect_arch():
     if m in ("aarch64", "arm64"):
         return {
             "gnu": "aarch64-unknown-linux-gnu",
-            "musl": "aarch64-unknown-linux-musl",
-            "micro": "linux-arm64",
-            "node": "arm64",
-            "misc": "arm64",
             "kernel": "aarch64",
-            "go": "arm64",
-            "deb": "arm64",
-            "rust": "aarch64",
+            "micro": "linux-arm64",
+            "misc": "arm64",
+            "musl": "aarch64-unknown-linux-musl",
+            "node": "arm64",
         }
     if m in ("x86_64", "amd64"):
         return {
             "gnu": "x86_64-unknown-linux-gnu",
-            "musl": "x86_64-unknown-linux-musl",
-            "micro": "linux64",
-            "node": "x64",
-            "misc": "amd64",
             "kernel": "x86_64",
-            "go": "amd64",
-            "deb": "amd64",
-            "rust": "x86_64",
+            "micro": "linux64",
+            "misc": "amd64",
+            "musl": "x86_64-unknown-linux-musl",
+            "node": "x64",
         }
     sys.exit(f"Unsupported architecture: {m}")
 
@@ -145,7 +140,7 @@ def _download(url, dest):
 
 def _extract(archive, dest_dir):
     archive = str(archive)
-    if archive.endswith(".tar.gz") or archive.endswith(".tgz"):
+    if archive.endswith((".tar.gz", ".tgz")):
         with tarfile.open(archive, "r:gz") as tf:
             try:
                 tf.extractall(dest_dir, filter="data")
@@ -217,12 +212,9 @@ def cmd_install_bin(args):
         sys.exit(f"Asset not found for {name}")
 
     # Codex additionally requires code mode host
-    code_mode_host_asset = None
     if name == "codex":
         code_mode_host_filename = f"codex-code-mode-host-{arch['musl']}.tar.gz"
-        code_mode_host_asset = next((a for a in assets if a["name"] == code_mode_host_filename), None)
-        if code_mode_host_asset is None:
-            sys.exit(f"Asset not found for codex-code-mode-host: {code_mode_host_filename}")
+        code_mode_host_asset = next(a for a in assets if a["name"] == code_mode_host_filename)
 
     url = match[0]["browser_download_url"]
     filename = url.rsplit("/", 1)[-1]
@@ -231,7 +223,7 @@ def cmd_install_bin(args):
         archive_path = Path(tmpdir) / filename
         _download(url, archive_path)
 
-        if filename.endswith(".zip") or filename.endswith(".tar.gz") or filename.endswith(".tgz"):
+        if filename.endswith((".zip", ".tar.gz", ".tgz")):
             extract_dir = Path(tmpdir)
             _extract(archive_path, extract_dir)
             archive_name = BIN_OVERRIDES[name](arch) if name in BIN_OVERRIDES else name
@@ -256,6 +248,12 @@ def cmd_install_bin(args):
                     sys.exit(f"Could not find {code_mode_host_binary} in archive")
                 code_mode_host_path.chmod(0o755)
                 _sudo("mv", str(code_mode_host_path), "/usr/local/bin/codex-code-mode-host")
+        elif filename.endswith(".bz2"):
+            bin_path = Path(tmpdir) / name
+            with bz2.open(archive_path, "rb") as src, open(bin_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            bin_path.chmod(0o755)
+            _sudo("mv", str(bin_path), f"/usr/local/bin/{name}")
         else:
             archive_path.chmod(0o755)
             _sudo("mv", str(archive_path), f"/usr/local/bin/{name}")
@@ -274,7 +272,7 @@ def cmd_install_deb(args):
     if not args.force and _has_cmd(cmd_name):
         return
 
-    arch_deb = arch["deb"]
+    arch_deb = arch["misc"]
     pattern = rf"^{re.escape(package)}_.+_{arch_deb}\.deb$"
     release = _github_latest(repo)
     assets = release.get("assets", [])
@@ -436,8 +434,8 @@ def cmd_install_fish(args):
 def cmd_install_go(args):
     osname = _detect_os()
     arch = _detect_arch()
-    go_arch = arch["go"]
-    go_os = osname.lower()
+    arch_go = arch["misc"]
+    os_go = osname.lower()
 
     req = Request("https://go.dev/VERSION?m=text")
     with urlopen(req) as resp:
@@ -445,7 +443,7 @@ def cmd_install_go(args):
     if not version:
         sys.exit("Failed to resolve latest Go version")
 
-    filename = f"{version}.{go_os}-{go_arch}.tar.gz"
+    filename = f"{version}.{os_go}-{arch_go}.tar.gz"
     url = f"https://go.dev/dl/{filename}"
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -458,13 +456,13 @@ def cmd_install_go(args):
 def cmd_install_rust(args):
     osname = _detect_os()
     arch = _detect_arch()
-    rust_arch = arch["rust"]
+    arch_rust = arch["kernel"]
     if osname == "Darwin":
-        rust_os = "apple-darwin"
+        os_rust = "apple-darwin"
     else:
-        rust_os = "unknown-linux-gnu"
+        os_rust = "unknown-linux-gnu"
 
-    host = f"{rust_arch}-{rust_os}"
+    host = f"{arch_rust}-{os_rust}"
     req = Request("https://sh.rustup.rs")
     with urlopen(req) as resp:
         installer = resp.read()
@@ -549,6 +547,7 @@ def cmd_setup_apt(args):
             ["dpkg-divert", "--truename", "/usr/bin/man"],
             capture_output=True,
             text=True,
+            check=False,
         )
         if r.stdout.strip() == "/usr/bin/man.REAL":
             _sudo("rm", "-f", "/usr/bin/man")
@@ -597,7 +596,7 @@ def cmd_setup_user(args):
 
     user = args.user
 
-    r = subprocess.run(["id", user], capture_output=True)
+    r = subprocess.run(["id", user], capture_output=True, check=False)
     if r.returncode == 0:
         sys.exit(f"User {user} already exists")
 
@@ -612,7 +611,7 @@ def cmd_setup_sudo(args):
     if not user:
         sys.exit("Cannot determine user")
 
-    r = subprocess.run(["id", user], capture_output=True)
+    r = subprocess.run(["id", user], capture_output=True, check=False)
     if r.returncode != 0:
         sys.exit(f"User {user} does not exist")
 
