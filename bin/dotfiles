@@ -34,7 +34,7 @@ BIN_REGISTRY = {
     "fastfetch": ("fastfetch-cli/fastfetch", lambda a: f"fastfetch-linux-{a['misc']}\\.tar\\.gz"),
     "fzf": ("junegunn/fzf", lambda a: f"fzf-.+-linux_{a['misc']}\\.tar\\.gz$"),
     "gh": ("cli/cli", lambda a: f"gh_.+_linux_{a['misc']}\\.tar\\.gz"),
-    "gws": ("googleworkspace/cli", lambda a: f"gws-{a['gnu']}\\.tar\\.gz$"),
+    "gws": ("googleworkspace/cli", lambda a: f"google-workspace-cli-{a['gnu']}\\.tar\\.gz$"),
     "lf": ("gokcehan/lf", lambda a: f"lf-linux-{a['misc']}\\.tar\\.gz"),
     "magick": ("imagemagick/imagemagick", lambda _: r"clang-x86_64\.AppImage$"),
     "micro": ("micro-editor/micro", lambda a: f"micro-.+-{a['micro']}\\.tar\\.gz$"),
