@@ -20,7 +20,7 @@ Set a `prefix` so global installs don't require `sudo` and binaries land in `~/.
 prefix=/home/<user>/.local
 ```
 
-Or export it in [`~/.exports`](https://github.com/adamelliotfields/dotfiles/blob/main/shared/.exports):
+Or export it in [`~/.exports`](https://github.com/0xfieldsy/dotfiles/blob/main/shared/.exports):
 
 ```sh
 export NPM_CONFIG_PREFIX="${HOME}/.local"

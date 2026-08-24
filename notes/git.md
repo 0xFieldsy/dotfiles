@@ -1,6 +1,6 @@
 # Git
 
-Most settings are in [`.config/git/config`](https://github.com/adamelliotfields/dotfiles/blob/main/shared/.config/git/config). The rest go in `~/.gitconfig`:
+Most settings are in [`.config/git/config`](https://github.com/0xfieldsy/dotfiles/blob/main/shared/.config/git/config). The rest go in `~/.gitconfig`:
 
 ```properties
 [user]
