@@ -1,0 +1,8 @@
+theme = "github_light"
+
+[keys.normal]
+C-s = ":w"  # save
+C-q = ":q"  # quit (no save)
+
+[keys.insert]
+C-s = ["normal_mode", ":w"]  # save (drops to normal mode first)

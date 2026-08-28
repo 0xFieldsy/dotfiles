@@ -25,4 +25,4 @@ xsel --clipboard --output
 xclip -selection clipboard -o
 ```
 
-The `nano` text editor uses its own buffer, but `micro` supports `xsel` and `xclip` via the [`clipper`](https://github.com/zyedidia/clipper) module.
+Nano uses its own buffer. Micro supports `xsel` and `xclip` via the [`clipper`](https://github.com/zyedidia/clipper) module. Helix copies to system clipboard with <kbd>Space</kbd>+<kbd>y</kbd> and pastes with <kbd>Space</kbd>+<kbd>p</kbd>.

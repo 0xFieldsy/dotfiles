@@ -18,9 +18,8 @@ from urllib.request import Request, urlopen
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 
-DEB_OVERRIDES = {
-    "ripgrep": "rg",
-}
+# Map package name to binary name.
+DEB_OVERRIDES = {"helix": "hx", "ripgrep": "rg"}
 
 # Map expected binary name to actual filename inside the archive.
 BIN_OVERRIDES = {
@@ -46,6 +45,12 @@ BIN_REGISTRY = {
         lambda a: f"shellcheck-v.+\\.linux\\.{a['kernel']}\\.tar\\.gz$",
     ),
     "ttyd": ("tsl0922/ttyd", lambda a: f"ttyd\\.{a['kernel']}$"),
+    "yt-dlp": (
+        "yt-dlp/yt-dlp",
+        lambda a: (
+            r"^yt-dlp_linux$" if a["kernel"] == "x86_64" else rf"^yt-dlp_linux_{a['kernel']}$"
+        ),
+    ),
 }
 
 MOTD_SCRIPT = """\
@@ -105,6 +110,10 @@ def _require_cmd(name):
 
 def _has_cmd(name):
     return shutil.which(name) is not None
+
+
+def _log(message):
+    print(f"dotfiles: {message}")
 
 
 def _sudo(*args):
@@ -201,6 +210,7 @@ def cmd_install_bin(args):
         sys.exit("magick AppImage is amd64 only")
 
     if not args.force and _has_cmd(name):
+        _log(f"{name} already installed (use --force)")
         return
 
     repo, pattern_fn = BIN_REGISTRY[name]
@@ -270,6 +280,7 @@ def cmd_install_deb(args):
     cmd_name = DEB_OVERRIDES.get(package, package)
 
     if not args.force and _has_cmd(cmd_name):
+        _log(f"{cmd_name} already installed (use --force)")
         return
 
     arch_deb = arch["misc"]
@@ -295,6 +306,7 @@ def cmd_install_uv(args):
     arch = _detect_arch()
 
     if not args.force and _has_cmd("uv") and _has_cmd("uvx"):
+        _log("uv already installed (use --force)")
         return
 
     pattern = rf"^uv-{re.escape(arch['gnu'])}\.tar\.gz$"
@@ -331,6 +343,7 @@ def cmd_install_btop(args):
     _require_cmd("g++-14")
 
     if not args.force and _has_cmd("btop"):
+        _log("btop already installed (use --force)")
         return
 
     release = _github_latest("aristocratos/btop")
@@ -367,6 +380,9 @@ def cmd_install_claude(args):
     _require_linux()
     _require_cmd("apt-get")
     _require_cmd("awk")
+
+    if _has_cmd("claude"):
+        return
 
     sources = Path("/etc/apt/sources.list.d/claude-code.sources")
     if not sources.exists():
@@ -430,6 +446,43 @@ def cmd_install_fish(args):
         )
 
 
+# INSTALL GCLOUD
+def cmd_install_gcloud(args):
+    _require_linux()
+    _require_cmd("apt-get")
+    _require_cmd("awk")
+
+    if _has_cmd("gcloud"):
+        return
+
+    sources = Path("/etc/apt/sources.list.d/google-cloud-sdk.sources")
+    if not sources.exists():
+        req = Request("https://packages.cloud.google.com/apt/doc/apt-key.gpg")
+        with urlopen(req) as resp:
+            key = resp.read()
+
+        indented_key = subprocess.run(
+            ["awk", '{ print ($0 == "" ? " ." : " " $0) }'],
+            input=key,
+            capture_output=True,
+            check=True,
+        ).stdout.decode()
+
+        # Apt DEB822 sources format
+        content = (
+            "Types: deb\n"
+            "URIs: https://packages.cloud.google.com/apt\n"
+            "Suites: cloud-sdk\n"
+            "Components: main\n"
+            "Signed-By:\n"
+            f"{indented_key}"
+        )
+        _write_file(str(sources), content)
+
+    _sudo("apt-get", "update")
+    _sudo("apt-get", "install", "google-cloud-cli")
+
+
 # INSTALL GO
 def cmd_install_go(args):
     osname = _detect_os()
@@ -457,6 +510,7 @@ def cmd_install_rust(args):
     osname = _detect_os()
     arch = _detect_arch()
     arch_rust = arch["kernel"]
+
     if osname == "Darwin":
         os_rust = "apple-darwin"
     else:
@@ -667,6 +721,9 @@ def build_parser():
 
     p = install_sub.add_parser("fish", help="Install Fish shell via apt")
     p.set_defaults(func=cmd_install_fish)
+
+    p = install_sub.add_parser("gcloud", help="Install Google Cloud CLI via apt")
+    p.set_defaults(func=cmd_install_gcloud)
 
     p = install_sub.add_parser("go", help="Install Go via go.dev")
     p.set_defaults(func=cmd_install_go)
