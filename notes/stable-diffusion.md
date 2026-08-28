@@ -15,7 +15,7 @@ Ensure `/opt/stable-diffusion-cpp` is in your `PATH`. See [`.exports`](../shared
 
 ## Usage
 
-Create [aliases](../shared/.aliases) for each model and run from the command line. Use `img2sixel` to preview images in the terminal.
+Create [aliases](../shared/.aliases) for each model and run from the command line. Use `img2sixel` to preview images in Windows Terminal or `chafa -f kitty` in Ghostty.
 
 ## Upscaling
 

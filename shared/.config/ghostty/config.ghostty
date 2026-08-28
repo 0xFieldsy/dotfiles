@@ -1,0 +1,11 @@
+theme = light:GitHub Light Default,dark:GitHub Dark Default
+font-family = MonoLisa Nerd Font
+cursor-style = bar
+clipboard-read = allow
+clipboard-write = allow
+clipboard-paste-protection = false
+copy-on-select = false
+keybind = ctrl+s=text:\x13
+keybind = ctrl+q=text:\x11
+keybind = ctrl+left_bracket=text:\x1b
+mouse-scroll-multiplier = precision:3,discrete:3
