@@ -6,6 +6,9 @@
 
 `/etc/locale.conf` is the system-wide default locale, read by systemd and most login processes. On Debian/Ubuntu it is also available as `/etc/default/locale`, which is a symlink.
 
+> [!NOTE]
+> Locale storage varies by distribution. Debian/Ubuntu commonly keep one directory per compiled locale, while other distributions use a single `/usr/lib/locale/locale-archive` file instead. Translation catalogs in `/usr/share/locale` are separate from compiled locale data and normally contain many languages.
+
 ## Clean up
 
 Both locale directories are typically full of locales you will never use. The procedure below keeps only `C.UTF-8` and `en_US.UTF-8` for locale data, and only `en` for translations.
@@ -33,4 +36,19 @@ sudo find /usr/lib/locale -mindepth 1 -maxdepth 1 -type d ! -name 'C.utf8' ! -na
 
 ```sh
 sudo find /usr/share/locale -mindepth 1 -maxdepth 1 -type d ! -name 'en' -exec rm -rf {} +
+```
+
+### Regenerate enabled locales
+
+```sh
+sudo locale-gen
+```
+
+### Set the default locale
+
+```sh
+sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+# Update current shell
+source /etc/default/locale
 ```
