@@ -2,20 +2,17 @@
 
 # linux
 if [ "$(uname -s)" = 'Linux' ] ; then
-  # games
-  if ! echo ":${PATH}:" | grep -q ':/usr/games:' ; then PATH="/usr/games:${PATH}" ; fi
-  if ! echo ":${PATH}:" | grep -q ':/usr/games/bin:' ; then PATH="/usr/games/bin:${PATH}" ; fi
-
   # wsl
   if [ -d '/usr/lib/wsl' ] ; then
-    LD_LIBRARY_PATH="/usr/lib/wsl/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+    export LD_LIBRARY_PATH="/usr/lib/wsl/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
   fi
 
   # rocm
-  export ROCM_PATH='/opt/rocm'
+  ROCM_PATH='/opt/rocm'
   if [ -d "${ROCM_PATH}" ] ; then
-    PATH="${ROCM_PATH}/bin:${PATH}"
-    LD_LIBRARY_PATH="${ROCM_PATH}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+    export ROCM_PATH
+    export PATH="${ROCM_PATH}/bin:${PATH}"
+    export LD_LIBRARY_PATH="${ROCM_PATH}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
     export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
     if [ -e "${ROCM_PATH}/lib/librocdxg.so" ] ; then
       export HSA_ENABLE_DXG_DETECTION=1
@@ -23,36 +20,44 @@ if [ "$(uname -s)" = 'Linux' ] ; then
   fi
 
   # cuda
-  export CUDA_HOME='/usr/local/cuda'
+  CUDA_HOME='/usr/local/cuda'
   if [ -d "${CUDA_HOME}" ] ; then
-    PATH="${CUDA_HOME}/bin:${PATH}"
-    LD_LIBRARY_PATH="${CUDA_HOME}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+    export CUDA_HOME
+    export PATH="${CUDA_HOME}/bin:${PATH}"
+    export LD_LIBRARY_PATH="${CUDA_HOME}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
   fi
-  export LD_LIBRARY_PATH
 
   # linux brew
   if [ -x '/home/linuxbrew/.linuxbrew/bin/brew' ] ; then
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv bash)"
+    export HOMEBREW_NO_ENV_HINTS=1
+    export HOMEBREW_NO_INSTALL_CLEANUP=1
   fi
 fi
 
-# apple
+# mac
 if [ "$(uname -s)" = 'Darwin' ] ; then
   # https://support.apple.com/en-us/HT208050
   export BASH_SILENCE_DEPRECATION_WARNING=1
 
   if [ -x '/opt/homebrew/bin/brew' ] ; then
     eval "$(/opt/homebrew/bin/brew shellenv bash)"
+    export HOMEBREW_NO_ENV_HINTS=1
+    export HOMEBREW_NO_INSTALL_CLEANUP=1
   fi
 fi
 
 # add local bin to path
 if [ ! -d "${HOME}/.local/bin" ] ; then mkdir -p "${HOME}/.local/bin" ; fi
-PATH="${HOME}/.local/bin:${PATH}"
+export PATH="${HOME}/.local/bin:${PATH}"
 
 # add dotfiles bin to path
-if [ -d "${HOME}/.dotfiles/bin" ] ; then PATH="${HOME}/.dotfiles/bin:${PATH}" ; fi
-if [ -d '/workspaces/.codespaces/.persistedshare/dotfiles/bin' ] ; then PATH="/workspaces/.codespaces/.persistedshare/dotfiles/bin:${PATH}" ; fi
+if [ -d "${HOME}/.dotfiles/bin" ] ; then
+  export PATH="${HOME}/.dotfiles/bin:${PATH}"
+fi
+if [ -d '/workspaces/.codespaces/.persistedshare/dotfiles/bin' ] ; then
+  export PATH="/workspaces/.codespaces/.persistedshare/dotfiles/bin:${PATH}"
+fi
 
 # editor
 export VISUAL="code -w"
@@ -63,15 +68,15 @@ else
 fi
 export GIT_EDITOR="$EDITOR"
 
+# pager
+export LESSHISTSIZE=0
+export PAGER='less -FRSX --tabs=2'
+
 # https://wiki.archlinux.org/title/XDG_Base_Directory
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
-
-# brew
-export HOMEBREW_NO_ENV_HINTS=1
-export HOMEBREW_NO_INSTALL_CLEANUP=1
 
 # node
 export NODE_NO_WARNINGS=1
@@ -86,10 +91,6 @@ export NPM_CONFIG_MIN_RELEASE_AGE=1
 export NPM_CONFIG_UPDATE_NOTIFIER=false
 export NPM_CONFIG_PREFIX="${HOME}/.local"
 
-# pnpm
-export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
-PATH="${PNPM_HOME}:${PATH}"
-
 # python
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 export PYDEVD_DISABLE_FILE_VALIDATION=1
@@ -100,10 +101,6 @@ export SCIKIT_LEARN_DATA="${XDG_CACHE_HOME}/scikit_learn_data"
 # statsmodels
 export STATSMODELS_DATA="${XDG_CACHE_HOME}/statsmodels_data"
 
-# tensorflow
-export TF_CPP_MIN_LOG_LEVEL=2
-export TFDS_DATA_DIR="${XDG_CACHE_HOME}/tensorflow_datasets"
-
 # huggingface
 export HF_HOME="${XDG_CACHE_HOME}/huggingface"
 export HF_DATASETS_CACHE="${XDG_CACHE_HOME}/huggingface/datasets"
@@ -111,22 +108,33 @@ export HF_HUB_CACHE="${XDG_CACHE_HOME}/huggingface/hub"
 export HF_HUB_ENABLE_HF_TRANSFER=1
 
 # llama.cpp
-export LLAMA_ARG_FIT=0
-export LLAMA_ARG_DIO=1
-export LLAMA_ARG_MMAP=0
-export LLAMA_ARG_MODELS_MAX=1
-export LLAMA_ARG_HOST='0.0.0.0'
-export LLAMA_ARG_N_GPU_LAYERS='all'
-export LLAMA_HOME="/opt/llama-cpp"  # extract llama.cpp here
-export LLAMA_ARG_MODELS_DIR="${HOME}/.gguf"  # download gguf here
-export LLAMA_ARG_MODELS_PRESET="${LLAMA_ARG_MODELS_DIR}/models.ini"
-PATH="${LLAMA_HOME}:${PATH}"
+LLAMA_HOME="/opt/llama-cpp"
+if [ -d "${LLAMA_HOME}" ] ; then
+  export LLAMA_ARG_PORT=9931
+  export LLAMA_ARG_HOST='0.0.0.0'
+  export LLAMA_ARG_CORS_ORIGINS='localhost'
+  export LLAMA_ARG_FIT=0
+  export LLAMA_ARG_LOAD_MODE='dio'
+  export LLAMA_ARG_LOG_VERBOSITY=2
+  export LLAMA_ARG_TOOLS='all'
+  export LLAMA_ARG_N_GPU_LAYERS='all'
+  export LLAMA_ARG_MODELS_MAX=1
+  export LLAMA_ARG_MODELS_DIR="${HOME}/.gguf"
+  export LLAMA_ARG_MODELS_PRESET="${LLAMA_ARG_MODELS_DIR}/models.ini"
+  export PATH="${LLAMA_HOME}:${PATH}"
+fi
 
 # stable-diffusion.cpp
-PATH="/opt/stable-diffusion-cpp:${PATH}"
+STABLE_DIFFUSION_HOME="/opt/stable-diffusion-cpp"
+if [ -d "${STABLE_DIFFUSION_HOME}" ] ; then
+  export PATH="${STABLE_DIFFUSION_HOME}:${PATH}"
+fi
 
 # opencode
 export OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT=1
+
+# ghostty
+export COLORTERM=truecolor
 
 # telemetry
 export DISABLE_TELEMETRY=1
@@ -135,11 +143,3 @@ export HOMEBREW_NO_ANALYTICS=1
 export ASTRO_TELEMETRY_DISABLED=1
 export HF_HUB_DISABLE_TELEMETRY=1
 export WRANGLER_SEND_METRICS=false
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-
-# misc
-export PAGER='less -FRSX --tabs=2'
-export LESSHISTSIZE=0
-
-# https://blog.ronin.cloud/linux-directories-paths
-export PATH="$PATH"
