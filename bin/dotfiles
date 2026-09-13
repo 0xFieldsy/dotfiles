@@ -45,6 +45,10 @@ BIN_REGISTRY = {
         lambda a: f"shellcheck-v.+\\.linux\\.{a['kernel']}\\.tar\\.gz$",
     ),
     "ttyd": ("tsl0922/ttyd", lambda a: f"ttyd\\.{a['kernel']}$"),
+    "xurl": (
+        "xdevplatform/xurl",
+        lambda a: f"xurl_Linux_{'x86_64' if a['kernel'] == 'x86_64' else a['misc']}\\.tar\\.gz$",
+    ),
     "yt-dlp": (
         "yt-dlp/yt-dlp",
         lambda a: (
