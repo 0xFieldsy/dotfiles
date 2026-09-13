@@ -6,3 +6,14 @@ C-q = ":q"  # quit (no save)
 
 [keys.insert]
 C-s = ["normal_mode", ":w"]  # save (drops to normal mode first)
+
+[editor.whitespace]
+render = "all"
+
+[editor.whitespace.characters]
+space = "·"
+nbsp = "⍽"
+nnbsp = "␣"
+tab = "→"
+newline = "⏎"
+tabpad = "·"
