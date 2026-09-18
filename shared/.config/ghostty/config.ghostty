@@ -1,11 +1,28 @@
 theme = light:GitHub Light Default,dark:GitHub Dark Default
-font-family = MonoLisa Nerd Font
+font-family = Maple Mono NF
+font-size = 14
+font-variation = wght=400
+font-variation-bold = wght=700
+font-variation-italic = wght=400
+font-variation-bold-italic = wght=700
+font-feature = +calt
 cursor-style = bar
+copy-on-select = false
 clipboard-read = allow
 clipboard-write = allow
 clipboard-paste-protection = false
-copy-on-select = false
-keybind = ctrl+s=text:\x13
-keybind = ctrl+q=text:\x11
-keybind = ctrl+left_bracket=text:\x1b
 mouse-scroll-multiplier = precision:3,discrete:3
+# \x08 BS
+# \x09 HT
+# \x0a LF
+# \x0d CR
+# \x11 XON
+# \x13 XOFF
+# \x1b ESC
+keybind = ctrl+h=text:\x08
+keybind = ctrl+i=text:\x09
+keybind = ctrl+j=text:\x0a
+keybind = ctrl+m=text:\x0d
+keybind = ctrl+q=text:\x11
+keybind = ctrl+s=text:\x13
+keybind = ctrl+left_bracket=text:\x1b
