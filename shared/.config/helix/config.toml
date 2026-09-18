@@ -1,19 +1,25 @@
 theme = "github_light"
 
 [keys.normal]
-C-s = ":w"  # save
-C-q = ":q"  # quit (no save)
+C-s = ":w"   # save
+C-q = ":q!"  # quit (no save)
 
 [keys.insert]
-C-s = ["normal_mode", ":w"]  # save (drops to normal mode first)
+C-s = ["normal_mode", ":w"]
+C-q = ["normal_mode", ":q!"]
 
-[editor.whitespace]
-render = "all"
+[editor]
+color-modes = true
+end-of-line-diagnostics = "disable"
 
-[editor.whitespace.characters]
-space = "·"
-nbsp = "⍽"
-nnbsp = "␣"
-tab = "→"
-newline = "⏎"
-tabpad = "·"
+[editor.inline-diagnostics]
+cursor-line = "disable"
+other-lines = "hint"
+
+[editor.whitespace.render]
+space = "all"
+nbsp = "all"
+nnbsp = "all"
+tab = "all"
+tabpad = "all"
+newline = "none"
