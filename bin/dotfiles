@@ -26,6 +26,24 @@ BIN_OVERRIDES = {
     "codex": lambda arch: f"codex-{arch['musl']}",
 }
 
+# Map linker name (-l) to a header required to compile against the library.
+LIB_HEADERS = {
+    "json-c": "json-c/json.h",
+    "ssl": "openssl/ssl.h",
+    "uv": "uv.h",
+    "websockets": "libwebsockets.h",
+    "z": "zlib.h",
+}
+
+# Map linker name (-l) to the Debian package providing the library.
+LIB_PACKAGES = {
+    "json-c": "libjson-c-dev",
+    "ssl": "libssl-dev",
+    "uv": "libuv1-dev",
+    "websockets": "libwebsockets-dev",
+    "z": "zlib1g-dev",
+}
+
 BIN_REGISTRY = {
     "agent-browser": ("vercel-labs/agent-browser", lambda a: f"agent-browser-linux-{a['node']}$"),
     "codex": ("openai/codex", lambda a: f"codex-{a['musl']}\\.tar\\.gz"),
@@ -34,6 +52,7 @@ BIN_REGISTRY = {
     "fzf": ("junegunn/fzf", lambda a: f"fzf-.+-linux_{a['misc']}\\.tar\\.gz$"),
     "gh": ("cli/cli", lambda a: f"gh_.+_linux_{a['misc']}\\.tar\\.gz"),
     "gws": ("googleworkspace/cli", lambda a: f"google-workspace-cli-{a['gnu']}\\.tar\\.gz$"),
+    "herdr": ("herdrdev/herdr", lambda a: f"^herdr-linux-{a['kernel']}$"),
     "lf": ("gokcehan/lf", lambda a: f"lf-linux-{a['misc']}\\.tar\\.gz"),
     "magick": ("imagemagick/imagemagick", lambda _: r"clang-x86_64\.AppImage$"),
     "micro": ("micro-editor/micro", lambda a: f"micro-.+-{a['micro']}\\.tar\\.gz$"),
@@ -44,7 +63,6 @@ BIN_REGISTRY = {
         "koalaman/shellcheck",
         lambda a: f"shellcheck-v.+\\.linux\\.{a['kernel']}\\.tar\\.gz$",
     ),
-    "ttyd": ("tsl0922/ttyd", lambda a: f"ttyd\\.{a['kernel']}$"),
     "xurl": (
         "xdevplatform/xurl",
         lambda a: f"xurl_Linux_{'x86_64' if a['kernel'] == 'x86_64' else a['misc']}\\.tar\\.gz$",
@@ -116,6 +134,38 @@ def _has_cmd(name):
     return shutil.which(name) is not None
 
 
+def _has_lib(name):
+    """Compile and link a program against a library to check it is usable."""
+    header = LIB_HEADERS.get(name, f"{name}.h")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src_path = Path(tmpdir) / "libtest.c"
+        bin_path = Path(tmpdir) / "libtest"
+        src_path.write_text(f"#include <{header}>\nint main(void) {{ return 0; }}\n")
+        result = subprocess.run(
+            ["cc", str(src_path), f"-l{name}", "-o", str(bin_path)],
+            capture_output=True,
+            check=False,
+        )
+    return result.returncode == 0
+
+
+def _install_libs(*names):
+    """Install the Debian packages providing the given libraries, if missing."""
+    missing = [name for name in names if not _has_lib(name)]
+    if not missing:
+        return
+
+    _sudo("apt-get", "update")
+    _sudo(
+        "env",
+        "DEBIAN_FRONTEND=noninteractive",
+        "apt-get",
+        "install",
+        "-y",
+        *[LIB_PACKAGES[name] for name in missing],
+    )
+
+
 def _log(message):
     print(f"dotfiles: {message}")
 
@@ -153,8 +203,8 @@ def _download(url, dest):
 
 def _extract(archive, dest_dir):
     archive = str(archive)
-    if archive.endswith((".tar.gz", ".tgz")):
-        with tarfile.open(archive, "r:gz") as tf:
+    if archive.endswith((".tgz", ".tar.gz", ".tar.xz")):
+        with tarfile.open(archive, "r:*") as tf:
             try:
                 tf.extractall(dest_dir, filter="data")
             except TypeError:
@@ -379,6 +429,36 @@ def cmd_install_btop(args):
         _sudo("make", "-C", str(repo_dir), "install")
 
 
+# INSTALL TTYD
+def cmd_install_ttyd(args):
+    _require_linux()
+    _require_cmd("apt-get")
+    _require_cmd("cc")
+    _require_cmd("cmake")
+
+    _install_libs("websockets", "uv", "json-c", "ssl", "z")
+
+    if not args.force and _has_cmd("ttyd"):
+        _log("ttyd already installed (use --force)")
+        return
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_dir = Path(tmpdir)
+        # Build main: ttyd has not tagged a release since 1.7.7 (March '24).
+        # A full clone is needed for the version to be derived from git describe.
+        subprocess.run(
+            ["git", "clone", "https://github.com/tsl0922/ttyd.git", str(repo_dir)],
+            check=True,
+        )
+        build_dir = repo_dir / "build"
+        subprocess.run(
+            ["cmake", "-B", str(build_dir), "-S", str(repo_dir), "-DCMAKE_BUILD_TYPE=Release"],
+            check=True,
+        )
+        subprocess.run(["cmake", "--build", str(build_dir)], check=True)
+        _sudo("cmake", "--install", str(build_dir))
+
+
 # INSTALL CLAUDE CODE
 def cmd_install_claude(args):
     _require_linux()
@@ -540,6 +620,64 @@ def cmd_install_rust(args):
         input=installer,
         check=True,
     )
+
+
+# INSTALL ZIG
+def cmd_install_zig(args):
+    _require_linux()
+    arch = _detect_arch()
+
+    if not args.force and _has_cmd("zig") and _has_cmd("zls"):
+        _log("zig already installed (use --force)")
+        return
+
+    req = Request("https://ziglang.org/download/index.json")
+    with urlopen(req) as resp:
+        index = json.loads(resp.read())
+
+    versions = [v for v in index if re.match(r"^\d+(\.\d+)*$", v)]
+    if not versions:
+        sys.exit("Failed to resolve latest Zig version")
+    version = max(versions, key=lambda v: tuple(int(p) for p in v.split(".")))
+
+    target = f"{arch['kernel']}-linux"
+    build = index[version].get(target)
+    if build is None:
+        sys.exit(f"Zig build not found for {target}")
+
+    zig_url = build["tarball"]
+    zls_url = f"https://github.com/zigtools/zls/releases/download/{version}/zls-{target}.tar.xz"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zig_dir = Path(tmpdir) / "zig"
+        zig_dir.mkdir()
+        zig_archive = Path(tmpdir) / zig_url.rsplit("/", 1)[-1]
+        _download(zig_url, zig_archive)
+        _extract(zig_archive, zig_dir)
+
+        # The tarball contains a single versioned directory.
+        roots = [p for p in zig_dir.iterdir() if p.is_dir()]
+        if len(roots) != 1:
+            sys.exit("Unexpected layout in Zig archive")
+        root = roots[0]
+
+        zls_archive = Path(tmpdir) / zls_url.rsplit("/", 1)[-1]
+        _download(zls_url, zls_archive)
+        _extract(zls_archive, zig_dir)
+
+        zls_path = _find_binary(zig_dir, "zls")
+        if zls_path is None:
+            sys.exit("Could not find zls in archive")
+        shutil.move(str(zls_path), str(root / "zls"))
+
+        (root / "zig").chmod(0o755)
+        (root / "zls").chmod(0o755)
+
+        _sudo("rm", "-rf", "/usr/local/zig")
+        _sudo("mv", str(root), "/usr/local/zig")
+
+    _sudo("ln", "-sf", "/usr/local/zig/zig", "/usr/local/bin/zig")
+    _sudo("ln", "-sf", "/usr/local/zig/zls", "/usr/local/bin/zls")
 
 
 # INSTALL NERDFONT
@@ -742,9 +880,17 @@ def build_parser():
     p = install_sub.add_parser("symlinks", help="Symlink dotfiles into $HOME")
     p.set_defaults(func=cmd_install_symlinks)
 
+    p = install_sub.add_parser("ttyd", help="Install ttyd from source")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_ttyd)
+
     p = install_sub.add_parser("uv", help="Install uv and uvx from GitHub releases")
     p.add_argument("-f", "--force", action="store_true")
     p.set_defaults(func=cmd_install_uv)
+
+    p = install_sub.add_parser("zig", help="Install Zig and zls into /usr/local/zig")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_zig)
 
     # SETUP
     setup = sub.add_parser("setup", help="System configuration")

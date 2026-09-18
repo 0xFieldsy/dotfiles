@@ -20,6 +20,8 @@ dotfiles install go
 dotfiles install rust
 dotfiles install nerdfont
 dotfiles install symlinks
+dotfiles install ttyd [-f, --force]
+dotfiles install zig [-f, --force]
 
 dotfiles setup apt
 dotfiles setup motd
