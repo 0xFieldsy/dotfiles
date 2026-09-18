@@ -60,12 +60,12 @@ if [ -d '/workspaces/.codespaces/.persistedshare/dotfiles/bin' ] ; then
 fi
 
 # editor
-export VISUAL="code -w"
-if [ "${CODESPACES}" = 'true' ] ; then
-  export EDITOR="$VISUAL"
+if [ "${CODESPACES:-}" = 'true' ] || [ "${TERM_PROGRAM:-}" = 'vscode' ] ; then
+  export VISUAL="code -w"
 else
-  export EDITOR='micro'
+  export VISUAL='micro'
 fi
+export EDITOR="$VISUAL"
 export GIT_EDITOR="$EDITOR"
 
 # pager
