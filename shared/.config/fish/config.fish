@@ -3,6 +3,9 @@ if status is-login ; and not status is-interactive
   exec /bin/sh
 end
 
+# disable primary device attribute query
+set -g fish_features $fish_features query-terminal=off
+
 # disable the default greeting
 set -g fish_greeting ''
 
