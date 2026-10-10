@@ -521,6 +521,43 @@ def cmd_install_fish(args):
         )
 
 
+# INSTALL FOUNDRY
+def cmd_install_foundry(args):
+    osname = _detect_os()
+    arch = _detect_arch()
+    os_foundry = "darwin" if osname == "Darwin" else "linux"
+    asset_name = f"foundryup_{os_foundry}_{arch['misc']}"
+
+    if os.environ.get("FOUNDRY_DIR"):
+        foundry_dir = Path(os.environ["FOUNDRY_DIR"])
+    elif os.environ.get("XDG_CONFIG_HOME"):
+        foundry_dir = Path(os.environ["XDG_CONFIG_HOME"]) / ".foundry"
+    else:
+        foundry_dir = Path.home() / ".foundry"
+    bin_dir = foundry_dir / "bin"
+    foundryup_path = bin_dir / "foundryup"
+
+    if not args.force and foundryup_path.exists():
+        _log("foundryup already installed (use --force)")
+        return
+
+    release = _github_latest("foundry-rs/foundryup")
+    assets = release.get("assets", [])
+    asset = next((a for a in assets if a["name"] == asset_name), None)
+    if asset is None:
+        sys.exit(f"Asset not found for foundryup: {asset_name}")
+
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    _download(asset["browser_download_url"], foundryup_path)
+    foundryup_path.chmod(0o755)
+
+    subprocess.run(
+        [str(foundryup_path)],
+        env={**os.environ, "FOUNDRY_DIR": str(foundry_dir)},
+        check=True,
+    )
+
+
 # INSTALL GCLOUD
 def cmd_install_gcloud(args):
     _require_linux()
@@ -885,6 +922,10 @@ def build_parser():
 
     p = install_sub.add_parser("fish", help="Install Fish shell via apt")
     p.set_defaults(func=cmd_install_fish)
+
+    p = install_sub.add_parser("foundry", help="Install foundryup and run it")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_foundry)
 
     p = install_sub.add_parser("gcloud", help="Install Google Cloud CLI via apt")
     p.set_defaults(func=cmd_install_gcloud)

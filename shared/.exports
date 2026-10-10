@@ -51,6 +51,17 @@ fi
 if [ ! -d "${HOME}/.local/bin" ] ; then mkdir -p "${HOME}/.local/bin" ; fi
 export PATH="${HOME}/.local/bin:${PATH}"
 
+# add cargo bin to path
+if [ -d "${HOME}/.cargo/bin" ] ; then
+  export PATH="${HOME}/.cargo/bin:${PATH}"
+fi
+
+# add foundry bin to path
+export FOUNDRY_DIR="${HOME}/.foundry"
+if [ -d "${FOUNDRY_DIR}/bin" ] ; then
+  export PATH="${FOUNDRY_DIR}/bin:${PATH}"
+fi
+
 # add dotfiles bin to path
 if [ -d "${HOME}/.dotfiles/bin" ] ; then
   export PATH="${HOME}/.dotfiles/bin:${PATH}"

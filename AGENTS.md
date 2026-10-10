@@ -15,6 +15,7 @@ dotfiles install uv [-f, --force]
 dotfiles install btop [-f, --force]
 dotfiles install claude [-c, --channel <latest|stable>]
 dotfiles install fish
+dotfiles install foundry [-f, --force]
 dotfiles install gcloud
 dotfiles install go
 dotfiles install rust
