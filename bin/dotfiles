@@ -11,7 +11,6 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import time
 import zipfile
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -26,27 +25,9 @@ BIN_OVERRIDES = {
     "codex": lambda arch: f"codex-{arch['musl']}",
 }
 
-# Map linker name (-l) to a header required to compile against the library.
-LIB_HEADERS = {
-    "json-c": "json-c/json.h",
-    "ssl": "openssl/ssl.h",
-    "uv": "uv.h",
-    "websockets": "libwebsockets.h",
-    "z": "zlib.h",
-}
-
-# Map linker name (-l) to the Debian package providing the library.
-LIB_PACKAGES = {
-    "json-c": "libjson-c-dev",
-    "ssl": "libssl-dev",
-    "uv": "libuv1-dev",
-    "websockets": "libwebsockets-dev",
-    "z": "zlib1g-dev",
-}
-
 BIN_REGISTRY = {
     "agent-browser": ("vercel-labs/agent-browser", lambda a: f"agent-browser-linux-{a['node']}$"),
-    "codex": ("openai/codex", lambda a: f"codex-{a['musl']}\\.tar\\.gz"),
+    "codex": ("openai/codex", lambda a: f"^codex-package-{a['musl']}\\.tar\\.gz$"),
     "duckdb": ("duckdb/duckdb", lambda a: f"duckdb_cli-linux-{a['misc']}\\.zip$"),
     "fastfetch": ("fastfetch-cli/fastfetch", lambda a: f"fastfetch-linux-{a['misc']}\\.tar\\.gz"),
     "fzf": ("junegunn/fzf", lambda a: f"fzf-.+-linux_{a['misc']}\\.tar\\.gz$"),
@@ -74,6 +55,26 @@ BIN_REGISTRY = {
         ),
     ),
 }
+
+# Map linker name (-l) to a header required to compile against the library.
+LIB_HEADERS = {
+    "json-c": "json-c/json.h",
+    "ssl": "openssl/ssl.h",
+    "uv": "uv.h",
+    "websockets": "libwebsockets.h",
+    "z": "zlib.h",
+}
+
+# Map linker name (-l) to the Debian package providing the library.
+LIB_PACKAGES = {
+    "json-c": "libjson-c-dev",
+    "ssl": "libssl-dev",
+    "uv": "libuv1-dev",
+    "websockets": "libwebsockets-dev",
+    "z": "zlib1g-dev",
+}
+
+CLAUDE_CHANNELS = ("latest", "stable")
 
 MOTD_SCRIPT = """\
 #!/bin/sh
@@ -275,17 +276,46 @@ def cmd_install_bin(args):
     if not match:
         sys.exit(f"Asset not found for {name}")
 
-    # Codex additionally requires code mode host
-    if name == "codex":
-        code_mode_host_filename = f"codex-code-mode-host-{arch['musl']}.tar.gz"
-        code_mode_host_asset = next(a for a in assets if a["name"] == code_mode_host_filename)
-
     url = match[0]["browser_download_url"]
     filename = url.rsplit("/", 1)[-1]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         archive_path = Path(tmpdir) / filename
         _download(url, archive_path)
+
+        if name == "codex":
+            package_dir = Path(tmpdir) / "package"
+            package_dir.mkdir()
+            _extract(archive_path, package_dir)
+            manifest_path = package_dir / "codex-package.json"
+            if not manifest_path.is_file():
+                sys.exit("Codex archive has no package manifest")
+            manifest = json.loads(manifest_path.read_text())
+            version = manifest.get("version", "")
+            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+                sys.exit("Codex package has an invalid version")
+            if manifest.get("target") != arch["musl"] or manifest.get("entrypoint") != "bin/codex":
+                sys.exit("Codex package has an unexpected layout")
+            for binary in ("codex", "codex-code-mode-host"):
+                if not (package_dir / "bin" / binary).is_file():
+                    sys.exit(f"Codex package is missing {binary}")
+
+            install_root = Path("/usr/local/lib/codex")
+            install_dir = install_root / version
+            _sudo("mkdir", "-p", str(install_root))
+            if install_dir.exists():
+                _sudo("rm", "-rf", str(install_dir))
+            _sudo("mv", str(package_dir), str(install_dir))
+            for binary in ("codex", "codex-code-mode-host"):
+                _sudo("ln", "-sfn", str(install_dir / "bin" / binary), f"/usr/local/bin/{binary}")
+            for old_dir in install_root.iterdir():
+                if (
+                    old_dir.name != version
+                    and old_dir.is_dir()
+                    and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", old_dir.name)
+                ):
+                    _sudo("rm", "-rf", str(old_dir))
+            return
 
         if filename.endswith((".zip", ".tar.gz", ".tgz")):
             extract_dir = Path(tmpdir)
@@ -297,21 +327,6 @@ def cmd_install_bin(args):
             bin_path.chmod(0o755)
             _sudo("mv", str(bin_path), f"/usr/local/bin/{name}")
 
-            if name == "codex":
-                # Prevent rate limit
-                if not _github_token():
-                    time.sleep(1)
-                code_mode_host_dir = Path(tmpdir) / "codex-code-mode-host"
-                code_mode_host_dir.mkdir()
-                code_mode_host_archive = code_mode_host_dir / code_mode_host_filename
-                _download(code_mode_host_asset["browser_download_url"], code_mode_host_archive)
-                _extract(code_mode_host_archive, code_mode_host_dir)
-                code_mode_host_binary = f"codex-code-mode-host-{arch['musl']}"
-                code_mode_host_path = _find_binary(code_mode_host_dir, code_mode_host_binary)
-                if code_mode_host_path is None:
-                    sys.exit(f"Could not find {code_mode_host_binary} in archive")
-                code_mode_host_path.chmod(0o755)
-                _sudo("mv", str(code_mode_host_path), "/usr/local/bin/codex-code-mode-host")
         elif filename.endswith(".bz2"):
             bin_path = Path(tmpdir) / name
             with bz2.open(archive_path, "rb") as src, open(bin_path, "wb") as dst:
@@ -429,47 +444,21 @@ def cmd_install_btop(args):
         _sudo("make", "-C", str(repo_dir), "install")
 
 
-# INSTALL TTYD
-def cmd_install_ttyd(args):
-    _require_linux()
-    _require_cmd("apt-get")
-    _require_cmd("cc")
-    _require_cmd("cmake")
-
-    _install_libs("websockets", "uv", "json-c", "ssl", "z")
-
-    if not args.force and _has_cmd("ttyd"):
-        _log("ttyd already installed (use --force)")
-        return
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        repo_dir = Path(tmpdir)
-        # Build main: ttyd has not tagged a release since 1.7.7 (March '24).
-        # A full clone is needed for the version to be derived from git describe.
-        subprocess.run(
-            ["git", "clone", "https://github.com/tsl0922/ttyd.git", str(repo_dir)],
-            check=True,
-        )
-        build_dir = repo_dir / "build"
-        subprocess.run(
-            ["cmake", "-B", str(build_dir), "-S", str(repo_dir), "-DCMAKE_BUILD_TYPE=Release"],
-            check=True,
-        )
-        subprocess.run(["cmake", "--build", str(build_dir)], check=True)
-        _sudo("cmake", "--install", str(build_dir))
-
-
 # INSTALL CLAUDE CODE
 def cmd_install_claude(args):
     _require_linux()
     _require_cmd("apt-get")
     _require_cmd("awk")
 
-    if _has_cmd("claude"):
-        return
-
     sources = Path("/etc/apt/sources.list.d/claude-code.sources")
-    if not sources.exists():
+    current = None
+    if sources.exists():
+        for line in sources.read_text().splitlines():
+            if line.startswith("URIs:"):
+                current = line.rsplit("/", 1)[-1].strip()
+                break
+
+    if current != args.channel:
         req = Request("https://downloads.claude.ai/keys/claude-code.asc")
         with urlopen(req) as resp:
             key = resp.read()
@@ -484,13 +473,15 @@ def cmd_install_claude(args):
         # Apt DEB822 sources format
         content = (
             "Types: deb\n"
-            "URIs: https://downloads.claude.ai/claude-code/apt/stable\n"
-            "Suites: stable\n"
+            f"URIs: https://downloads.claude.ai/claude-code/apt/{args.channel}\n"
+            f"Suites: {args.channel}\n"
             "Components: main\n"
             "Signed-By:\n"
             f"{indented_key}"
         )
         _write_file(str(sources), content)
+    elif _has_cmd("claude"):
+        return
 
     _sudo("apt-get", "update")
     _sudo("apt-get", "install", "claude-code")
@@ -589,6 +580,25 @@ def cmd_install_go(args):
         _sudo("tar", "-C", "/usr/local", "-xzf", str(dest))
 
 
+# INSTALL NERDFONT
+def cmd_install_nerdfont(args):
+    _require_linux()
+    _require_cmd("fc-cache")
+
+    name = args.name
+    url = f"https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{name}.zip"
+    font_dir = Path.home() / ".fonts" / name
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = Path(tmpdir) / f"{name}.zip"
+        _download(url, dest)
+        font_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(dest) as zf:
+            zf.extractall(font_dir)
+
+    subprocess.run(["fc-cache", "-f"], check=True)
+
+
 # INSTALL RUST
 def cmd_install_rust(args):
     osname = _detect_os()
@@ -620,6 +630,62 @@ def cmd_install_rust(args):
         input=installer,
         check=True,
     )
+
+
+# INSTALL SYMLINKS
+def cmd_install_symlinks(args):
+    osname = _detect_os()
+    if osname == "Darwin":
+        folders = ["shared", "mac"]
+    else:
+        folders = ["shared", "linux"]
+
+    for folder in folders:
+        src_dir = REPO_DIR / folder
+        if not src_dir.is_dir():
+            sys.exit(f"Cannot find source folder: {src_dir}")
+
+        for src_file in src_dir.rglob("*"):
+            if not src_file.is_file():
+                continue
+            rel = src_file.relative_to(src_dir)
+            dest = Path.home() / rel
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.is_dir() and not dest.is_symlink():
+                shutil.rmtree(dest)
+            dest.unlink(missing_ok=True)
+            dest.symlink_to(src_file.resolve())
+
+
+# INSTALL TTYD
+def cmd_install_ttyd(args):
+    _require_linux()
+    _require_cmd("apt-get")
+    _require_cmd("cc")
+    _require_cmd("cmake")
+
+    _install_libs("websockets", "uv", "json-c", "ssl", "z")
+
+    if not args.force and _has_cmd("ttyd"):
+        _log("ttyd already installed (use --force)")
+        return
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_dir = Path(tmpdir)
+        # Build main: ttyd has not tagged a release since 1.7.7 (March '24).
+        # A full clone is needed for the version to be derived from git describe.
+        subprocess.run(
+            ["git", "clone", "https://github.com/tsl0922/ttyd.git", str(repo_dir)],
+            check=True,
+        )
+        build_dir = repo_dir / "build"
+        subprocess.run(
+            ["cmake", "-B", str(build_dir), "-S", str(repo_dir), "-DCMAKE_BUILD_TYPE=Release"],
+            check=True,
+        )
+        subprocess.run(["cmake", "--build", str(build_dir)], check=True)
+        _sudo("cmake", "--install", str(build_dir))
 
 
 # INSTALL ZIG
@@ -678,51 +744,6 @@ def cmd_install_zig(args):
 
     _sudo("ln", "-sf", "/usr/local/zig/zig", "/usr/local/bin/zig")
     _sudo("ln", "-sf", "/usr/local/zig/zls", "/usr/local/bin/zls")
-
-
-# INSTALL NERDFONT
-def cmd_install_nerdfont(args):
-    _require_linux()
-    _require_cmd("fc-cache")
-
-    name = args.name
-    url = f"https://github.com/ryanoasis/nerd-fonts/releases/latest/download/{name}.zip"
-    font_dir = Path.home() / ".fonts" / name
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        dest = Path(tmpdir) / f"{name}.zip"
-        _download(url, dest)
-        font_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(dest) as zf:
-            zf.extractall(font_dir)
-
-    subprocess.run(["fc-cache", "-f"], check=True)
-
-
-# INSTALL SYMLINKS
-def cmd_install_symlinks(args):
-    osname = _detect_os()
-    if osname == "Darwin":
-        folders = ["shared", "mac"]
-    else:
-        folders = ["shared", "linux"]
-
-    for folder in folders:
-        src_dir = REPO_DIR / folder
-        if not src_dir.is_dir():
-            sys.exit(f"Cannot find source folder: {src_dir}")
-
-        for src_file in src_dir.rglob("*"):
-            if not src_file.is_file():
-                continue
-            rel = src_file.relative_to(src_dir)
-            dest = Path.home() / rel
-
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if dest.is_dir() and not dest.is_symlink():
-                shutil.rmtree(dest)
-            dest.unlink(missing_ok=True)
-            dest.symlink_to(src_file.resolve())
 
 
 # SETUP APT
@@ -854,6 +875,7 @@ def build_parser():
     p.set_defaults(func=cmd_install_btop)
 
     p = install_sub.add_parser("claude", help="Install Claude Code via apt")
+    p.add_argument("-c", "--channel", choices=CLAUDE_CHANNELS, default="latest")
     p.set_defaults(func=cmd_install_claude)
 
     p = install_sub.add_parser("deb", help="Install Debian package from GitHub releases")
