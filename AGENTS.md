@@ -19,6 +19,7 @@ dotfiles install foundry [-f, --force]
 dotfiles install gcloud
 dotfiles install go
 dotfiles install rust
+dotfiles install solana [-f, --force]
 dotfiles install nerdfont
 dotfiles install symlinks
 dotfiles install ttyd [-f, --force]

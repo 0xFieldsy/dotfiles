@@ -62,6 +62,11 @@ if [ -d "${FOUNDRY_DIR}/bin" ] ; then
   export PATH="${FOUNDRY_DIR}/bin:${PATH}"
 fi
 
+# add solana bin to path
+if [ -d "${HOME}/.local/share/solana/install/active_release/bin" ] ; then
+  export PATH="${HOME}/.local/share/solana/install/active_release/bin:${PATH}"
+fi
+
 # add dotfiles bin to path
 if [ -d "${HOME}/.dotfiles/bin" ] ; then
   export PATH="${HOME}/.dotfiles/bin:${PATH}"
