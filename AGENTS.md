@@ -13,7 +13,7 @@ dotfiles install bin [-f, --force] <name>
 dotfiles install deb [-f, --force] <repo>
 dotfiles install uv [-f, --force]
 dotfiles install btop [-f, --force]
-dotfiles install claude
+dotfiles install claude [-c, --channel <latest|stable>]
 dotfiles install fish
 dotfiles install gcloud
 dotfiles install go
