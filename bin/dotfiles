@@ -811,9 +811,19 @@ def cmd_install_zig(args):
     with urlopen(req) as resp:
         index = json.loads(resp.read())
 
-    versions = [v for v in index if re.match(r"^\d+(\.\d+)*$", v)]
+    release = _github_latest("zigtools/zls")
+    zls_version = release.get("tag_name", "").removeprefix("v")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", zls_version):
+        sys.exit("Failed to resolve latest ZLS version")
+
+    # ZLS and Zig must share a major/minor version; patch versions may differ.
+    versions = [
+        v
+        for v in index
+        if re.fullmatch(r"\d+\.\d+\.\d+", v) and v.split(".")[:2] == zls_version.split(".")[:2]
+    ]
     if not versions:
-        sys.exit("Failed to resolve latest Zig version")
+        sys.exit(f"No stable Zig version compatible with ZLS {zls_version}")
     version = max(versions, key=lambda v: tuple(int(p) for p in v.split(".")))
 
     target = f"{arch['kernel']}-linux"
@@ -822,7 +832,11 @@ def cmd_install_zig(args):
         sys.exit(f"Zig build not found for {target}")
 
     zig_url = build["tarball"]
-    zls_url = f"https://github.com/zigtools/zls/releases/download/{version}/zls-{target}.tar.xz"
+    asset_name = f"zls-{target}.tar.xz"
+    asset = next((a for a in release.get("assets", []) if a["name"] == asset_name), None)
+    if asset is None:
+        sys.exit(f"Asset not found for ZLS {zls_version}: {asset_name}")
+    zls_url = asset["browser_download_url"]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         zig_dir = Path(tmpdir) / "zig"
