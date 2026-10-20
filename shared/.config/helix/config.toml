@@ -10,11 +10,26 @@ C-q = ["normal_mode", ":q!"]
 
 [editor]
 color-modes = true
-end-of-line-diagnostics = "disable"
+cursorline = true
+bufferline = "multiple"
+end-of-line-diagnostics = "hint"
+
+[editor.cursor-shape]
+normal = "block"
+insert = "bar"
+select = "underline"
+
+[editor.indent-guides]
+render = true
 
 [editor.inline-diagnostics]
 cursor-line = "disable"
 other-lines = "hint"
+
+[editor.statusline]
+left = ["mode", "version-control", "spinner"]
+center = ["file-name", "read-only-indicator"]
+right = ["diagnostics", "position", "file-type"]
 
 [editor.whitespace.render]
 space = "all"
