@@ -2,6 +2,7 @@
 
 import argparse
 import bz2
+import gzip
 import json
 import os
 import platform
@@ -74,6 +75,8 @@ LIB_PACKAGES = {
 }
 
 CLAUDE_CHANNELS = ("latest", "stable")
+
+GROK_CHANNELS = ("stable", "alpha")
 
 MOTD_SCRIPT = """\
 #!/bin/sh
@@ -191,9 +194,9 @@ def _github_latest(repo):
         return json.loads(resp.read())
 
 
-def _download(url, dest):
+def _download(url, dest, gh_token=True):
     req = Request(url)
-    token = _github_token()
+    token = _github_token() if gh_token else ""
     if token:
         req.add_header("Authorization", f"token {token}")
     with urlopen(req) as resp, open(dest, "wb") as f:
@@ -616,6 +619,60 @@ def cmd_install_go(args):
         _sudo("tar", "-C", "/usr/local", "-xzf", str(dest))
 
 
+# INSTALL GROK
+def cmd_install_grok(args):
+    osname = _detect_os()
+    grok_os = {"Linux": "linux", "Darwin": "macos"}[osname]
+    grok_arch = "aarch64" if osname == "Darwin" else _detect_arch()["kernel"]  # Apple silicon only
+    target = f"{grok_os}-{grok_arch}"
+
+    base = "https://x.ai/cli"
+    try:
+        with urlopen(Request(f"{base}/{args.channel}")) as resp:
+            version = resp.read().decode().strip()
+    except OSError:
+        sys.exit(f"Failed to resolve the latest Grok version on channel {args.channel}")
+
+    grok_home = Path.home() / ".grok"
+    bin_dir = grok_home / "bin"
+    grok_path = bin_dir / "grok"
+
+    if not args.force and grok_path.exists():
+        _log("grok already installed (use --force)")
+        return
+
+    filename = f"grok-{version}-{target}.gz"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = Path(tmpdir) / filename
+        staged = Path(tmpdir) / "grok"
+        _download(f"{base}/{filename}", archive, gh_token=False)
+        with gzip.open(archive, "rb") as src, open(staged, "wb") as out:
+            shutil.copyfileobj(src, out)
+        staged.chmod(0o755)
+        result = subprocess.run([str(staged), "--version"], capture_output=True, check=False)
+        if result.returncode != 0:
+            sys.exit("Downloaded Grok binary failed to run")
+        shutil.move(str(staged), str(grok_path))
+
+    # The agent command is the same binary under a different name; Cursor CLI is now cursor-agent.
+    agent_path = bin_dir / "agent"
+    agent_path.unlink(missing_ok=True)
+    agent_path.symlink_to("grok")
+
+    # ~/.local/bin is already on PATH.
+    local_bin = Path.home() / ".local" / "bin"
+    local_bin.mkdir(parents=True, exist_ok=True)
+    for name in ("grok", "agent"):
+        link = local_bin / name
+        link.unlink(missing_ok=True)
+        link.symlink_to(bin_dir / name)
+
+    config = grok_home / "config.toml"
+    if not config.exists():
+        config.write_text('[cli]\ninstaller = "internal"\n')
+
+
 # INSTALL NERDFONT
 def cmd_install_nerdfont(args):
     _require_linux()
@@ -1018,6 +1075,11 @@ def build_parser():
 
     p = install_sub.add_parser("go", help="Install Go via go.dev")
     p.set_defaults(func=cmd_install_go)
+
+    p = install_sub.add_parser("grok", help="Install Grok Build")
+    p.add_argument("-c", "--channel", choices=GROK_CHANNELS, default="stable")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_grok)
 
     p = install_sub.add_parser("nerdfont", help="Install a Nerd Font")
     p.add_argument("name", metavar="FONT")
