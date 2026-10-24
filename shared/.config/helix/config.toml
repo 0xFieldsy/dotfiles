@@ -27,7 +27,7 @@ cursor-line = "disable"
 other-lines = "hint"
 
 [editor.statusline]
-left = ["mode", "version-control", "spinner"]
+left = ["mode", "version-control"]
 center = ["file-name", "read-only-indicator"]
 right = ["diagnostics", "position", "file-type"]
 

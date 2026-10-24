@@ -8,8 +8,8 @@ declare -a linux_apt_python=( 'libbz2-dev' 'libffi-dev' 'liblzma-dev' 'libncurse
 declare -a linux_apt_appimage=( 'libfuse2' )
 declare -a linux_apt_chromium=( 'libnss3' )
 
-declare -a linux_bin=( 'fzf' 'lf' 'micro' )
-declare -a linux_deb=( 'burntsushi/ripgrep' 'lsd-rs/lsd' 'sharkdp/fd' 'ajeetdsouza/zoxide' )
+declare -a linux_bin=( 'fzf' 'lf' )
+declare -a linux_deb=( 'ajeetdsouza/zoxide' 'burntsushi/ripgrep' 'helix-editor/helix' 'lsd-rs/lsd' 'sharkdp/fd' )
 
 export DEBIAN_FRONTEND=noninteractive
 

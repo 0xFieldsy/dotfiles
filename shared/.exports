@@ -79,7 +79,7 @@ fi
 if [ "${CODESPACES:-}" = 'true' ] || [ "${TERM_PROGRAM:-}" = 'vscode' ] ; then
   export VISUAL="code -w"
 else
-  export VISUAL='micro'
+  export VISUAL='hx'
 fi
 export EDITOR="$VISUAL"
 export GIT_EDITOR="$EDITOR"
