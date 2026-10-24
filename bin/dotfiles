@@ -523,6 +523,45 @@ def cmd_install_fish(args):
         )
 
 
+# INSTALL FLYLINE
+def cmd_install_flyline(args):
+    osname = _detect_os()
+    arch = _detect_arch()
+    target = f"{arch['kernel']}-apple-darwin" if osname == "Darwin" else arch["gnu"]
+    lib_name = "libflyline.dylib" if osname == "Darwin" else "libflyline.so"
+    lib_dir = Path.home() / ".local/lib"
+    link_path = lib_dir / lib_name
+
+    if not args.force and link_path.exists():
+        _log("flyline already installed (use --force)")
+        return
+
+    pattern = rf"^libflyline-v.+-{re.escape(target)}\.tar\.gz$"
+    release = _github_latest("HalFrgrd/flyline")
+    assets = release.get("assets", [])
+    asset = next((a for a in assets if re.search(pattern, a["name"])), None)
+    if asset is None:
+        sys.exit("Asset not found for flyline")
+
+    url = asset["browser_download_url"]
+    filename = url.rsplit("/", 1)[-1]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        extract_dir = Path(tmpdir)
+        archive_path = extract_dir / filename
+        _download(url, archive_path)
+        _extract(archive_path, extract_dir)
+
+        lib_path = next((p for p in extract_dir.rglob(f"{lib_name}.*") if p.is_file()), None)
+        if lib_path is None:
+            sys.exit(f"Could not find {lib_name}.<version> in archive")
+
+        lib_dir.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(lib_path), str(lib_dir / lib_path.name))
+        link_path.unlink(missing_ok=True)
+        link_path.symlink_to(lib_path.name)
+
+
 # INSTALL FOUNDRY
 def cmd_install_foundry(args):
     osname = _detect_os()
@@ -1065,6 +1104,10 @@ def build_parser():
 
     p = install_sub.add_parser("fish", help="Install Fish shell via apt")
     p.set_defaults(func=cmd_install_fish)
+
+    p = install_sub.add_parser("flyline", help="Install Flyline from GitHub releases")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_flyline)
 
     p = install_sub.add_parser("foundry", help="Install foundryup and run it")
     p.add_argument("-f", "--force", action="store_true")

@@ -32,15 +32,19 @@ Put this in `~/.ssh/config`:
 
 ```
 Host *
+  SetEnv LANG=C.UTF-8
   HashKnownHosts no
   UpdateHostKeys no
   IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_rsa
 
 Host your-server
   HostName <server>
-  IdentityFile ~/.ssh/id_rsa
   User <user>
 ```
+
+> [!NOTE]
+> Windows' `ssh.exe` doesn't send `LANG`, so tmux on the server treats the client as non-UTF-8. `SetEnv` sends it, and the server accepts it with `AcceptEnv LANG LC_*`. Check with `tmux display -p '#{client_utf8}'`.
 
 ## Server settings
 

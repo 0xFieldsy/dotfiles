@@ -10,26 +10,29 @@ The `bin/dotfiles` script is a single-file Python CLI with the following command
 
 ```txt
 dotfiles install bin [-f, --force] <name>
-dotfiles install deb [-f, --force] <repo>
-dotfiles install uv [-f, --force]
 dotfiles install btop [-f, --force]
 dotfiles install claude [-c, --channel <latest|stable>]
+dotfiles install deb [-f, --force] <org/repo>
 dotfiles install fish
+dotfiles install flyline [-f, --force]
 dotfiles install foundry [-f, --force]
 dotfiles install gcloud
 dotfiles install go
 dotfiles install grok [-f, --force] [-c, --channel <stable|alpha>]
+dotfiles install nerdfont <font>
 dotfiles install rust
 dotfiles install solana [-f, --force]
-dotfiles install nerdfont
 dotfiles install symlinks
 dotfiles install ttyd [-f, --force]
+dotfiles install uv [-f, --force]
 dotfiles install zig [-f, --force]
 
 dotfiles setup apt
 dotfiles setup motd
-dotfiles setup shell [-u, --user] <shell>
+dotfiles setup shell [-u, --user <user>] <shell>
 dotfiles setup sshd
-dotfiles setup sudo [-u, --user]
+dotfiles setup sudo [-u, --user <user>]
 dotfiles setup user <user>
 ```
+
+Use `-h` or `--help` on any command to see its usage. `dotfiles install bin --help` also lists all supported binary names.

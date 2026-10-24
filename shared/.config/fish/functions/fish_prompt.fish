@@ -64,7 +64,7 @@ function fish_prompt -d 'Write out the prompt'
 
   # python
   set -q VIRTUAL_ENV ; and begin
-    echo -ns (set_color $color_python)$icon_python' '
+    echo -ns (set_color $color_python)$icon_python' ' (path basename -- "$VIRTUAL_ENV") ' '
   end
 
   # command duration and exit status
