@@ -728,6 +728,26 @@ def cmd_install_grok(args):
         config.write_text('[cli]\ninstaller = "internal"\n')
 
 
+# INSTALL HOME
+def cmd_install_home(args):
+    _detect_os()
+    src_dir = REPO_DIR / "home"
+    if not src_dir.is_dir():
+        sys.exit(f"Cannot find source folder: {src_dir}")
+
+    for src_file in src_dir.rglob("*"):
+        if not src_file.is_file():
+            continue
+        rel = src_file.relative_to(src_dir)
+        dest = Path.home() / rel
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.is_dir() and not dest.is_symlink():
+            shutil.rmtree(dest)
+        dest.unlink(missing_ok=True)
+        dest.symlink_to(src_file.resolve())
+
+
 # INSTALL NERDFONT
 def cmd_install_nerdfont(args):
     _require_linux()
@@ -854,32 +874,6 @@ def cmd_install_solana(args):
             shutil.move(str(src), dest)
 
 
-# INSTALL SYMLINKS
-def cmd_install_symlinks(args):
-    osname = _detect_os()
-    if osname == "Darwin":
-        folders = ["shared", "mac"]
-    else:
-        folders = ["shared", "linux"]
-
-    for folder in folders:
-        src_dir = REPO_DIR / folder
-        if not src_dir.is_dir():
-            sys.exit(f"Cannot find source folder: {src_dir}")
-
-        for src_file in src_dir.rglob("*"):
-            if not src_file.is_file():
-                continue
-            rel = src_file.relative_to(src_dir)
-            dest = Path.home() / rel
-
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if dest.is_dir() and not dest.is_symlink():
-                shutil.rmtree(dest)
-            dest.unlink(missing_ok=True)
-            dest.symlink_to(src_file.resolve())
-
-
 # INSTALL TTYD
 def cmd_install_ttyd(args):
     _require_linux()
@@ -914,6 +908,24 @@ def cmd_install_ttyd(args):
 def cmd_install_neovim(args):
     _require_linux()
     arch = _detect_arch()
+
+    # Ubuntu's neovim package is older than what LazyVim requires.
+    if shutil.which("dpkg-query"):
+        result = subprocess.run(
+            ["dpkg-query", "-W", "-f", "${Status}", "neovim"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.startswith("install ok installed"):
+            _sudo(
+                "env",
+                "DEBIAN_FRONTEND=noninteractive",
+                "apt-get",
+                "remove",
+                "-y",
+                "neovim",
+            )
 
     install_dir = Path("/usr/local/neovim")
     if not args.force and _has_cmd("nvim"):
@@ -1176,6 +1188,9 @@ def build_parser():
     p.add_argument("-f", "--force", action="store_true")
     p.set_defaults(func=cmd_install_grok)
 
+    p = install_sub.add_parser("home", help="Install dotfiles into $HOME")
+    p.set_defaults(func=cmd_install_home)
+
     p = install_sub.add_parser("neovim", help="Install Neovim into /usr/local/neovim")
     p.add_argument("-f", "--force", action="store_true")
     p.set_defaults(func=cmd_install_neovim)
@@ -1190,9 +1205,6 @@ def build_parser():
     p = install_sub.add_parser("solana", help="Install Solana CLI, Anchor, and Surfpool")
     p.add_argument("-f", "--force", action="store_true")
     p.set_defaults(func=cmd_install_solana)
-
-    p = install_sub.add_parser("symlinks", help="Symlink dotfiles into $HOME")
-    p.set_defaults(func=cmd_install_symlinks)
 
     p = install_sub.add_parser("ttyd", help="Install ttyd from source")
     p.add_argument("-f", "--force", action="store_true")

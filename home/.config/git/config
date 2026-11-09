@@ -18,23 +18,16 @@
 	rebase = false
 	ff = only
 [diff]
-	tool = code
+	tool = nvimdiff2
 	color = always
 	colorMoved = default
 [difftool]
 	prompt = false
-	trustExitCode = true
-# https://code.visualstudio.com/docs/sourcecontrol/overview#_vs-code-as-git-difftool-and-mergetool
-[difftool "code"]
-	cmd = code --wait --diff $LOCAL $REMOTE
 [merge]
-	tool = code
+	tool = nvimdiff2
 [mergetool]
 	prompt = false
 	keepBackup = false
-[mergetool "code"]
-	cmd = code --wait --merge $REMOTE $LOCAL $BASE $MERGED
-	trustExitCode = true
 [safe]
 	directory = *
 [filter "lfs"]

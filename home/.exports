@@ -1,4 +1,14 @@
 # shellcheck shell=sh
+# move to the front of PATH, removing any other copies
+path_prepend() {
+  PATH=":${PATH}:"
+  while case $PATH in *":$1:"*) true ;; *) false ;; esac; do
+    PATH="${PATH%%:"$1":*}:${PATH#*:"$1":}"
+  done
+  PATH="${PATH#:}"
+  PATH="${PATH%:}"
+  PATH="$1${PATH:+:${PATH}}"
+}
 
 # linux
 if [ "$(uname -s)" = 'Linux' ] ; then
@@ -11,7 +21,7 @@ if [ "$(uname -s)" = 'Linux' ] ; then
   ROCM_PATH='/opt/rocm'
   if [ -d "${ROCM_PATH}" ] ; then
     export ROCM_PATH
-    export PATH="${ROCM_PATH}/bin:${PATH}"
+    path_prepend "${ROCM_PATH}/bin"
     export LD_LIBRARY_PATH="${ROCM_PATH}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
     export TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1
     if [ -e "${ROCM_PATH}/lib/librocdxg.so" ] ; then
@@ -23,7 +33,7 @@ if [ "$(uname -s)" = 'Linux' ] ; then
   CUDA_HOME='/usr/local/cuda'
   if [ -d "${CUDA_HOME}" ] ; then
     export CUDA_HOME
-    export PATH="${CUDA_HOME}/bin:${PATH}"
+    path_prepend "${CUDA_HOME}/bin"
     export LD_LIBRARY_PATH="${CUDA_HOME}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
   fi
 
@@ -49,37 +59,41 @@ fi
 
 # add local bin to path
 if [ ! -d "${HOME}/.local/bin" ] ; then mkdir -p "${HOME}/.local/bin" ; fi
-export PATH="${HOME}/.local/bin:${PATH}"
+path_prepend "${HOME}/.local/bin"
+
+# add go bin to path
+export GOPATH="${HOME}/.go"
+path_prepend "${GOPATH}/bin"
 
 # add cargo bin to path
 if [ -d "${HOME}/.cargo/bin" ] ; then
-  export PATH="${HOME}/.cargo/bin:${PATH}"
+  path_prepend "${HOME}/.cargo/bin"
 fi
 
 # add foundry bin to path
 export FOUNDRY_DIR="${HOME}/.foundry"
 if [ -d "${FOUNDRY_DIR}/bin" ] ; then
-  export PATH="${FOUNDRY_DIR}/bin:${PATH}"
+  path_prepend "${FOUNDRY_DIR}/bin"
 fi
 
 # add solana bin to path
 if [ -d "${HOME}/.local/share/solana/install/active_release/bin" ] ; then
-  export PATH="${HOME}/.local/share/solana/install/active_release/bin:${PATH}"
+  path_prepend "${HOME}/.local/share/solana/install/active_release/bin"
 fi
 
 # add dotfiles bin to path
 if [ -d "${HOME}/.dotfiles/bin" ] ; then
-  export PATH="${HOME}/.dotfiles/bin:${PATH}"
+  path_prepend "${HOME}/.dotfiles/bin"
 fi
 if [ -d '/workspaces/.codespaces/.persistedshare/dotfiles/bin' ] ; then
-  export PATH="/workspaces/.codespaces/.persistedshare/dotfiles/bin:${PATH}"
+  path_prepend "/workspaces/.codespaces/.persistedshare/dotfiles/bin"
 fi
 
 # editor
 if [ "${CODESPACES:-}" = 'true' ] || [ "${TERM_PROGRAM:-}" = 'vscode' ] ; then
   export VISUAL="code -w"
 else
-  export VISUAL='hx'
+  export VISUAL='nvim'
 fi
 export EDITOR="$VISUAL"
 export GIT_EDITOR="$EDITOR"
@@ -137,13 +151,13 @@ if [ -d "${LLAMA_HOME}" ] ; then
   export LLAMA_ARG_MODELS_MAX=1
   export LLAMA_ARG_MODELS_DIR="${HOME}/.gguf"
   export LLAMA_ARG_MODELS_PRESET="${LLAMA_ARG_MODELS_DIR}/models.ini"
-  export PATH="${LLAMA_HOME}:${PATH}"
+  path_prepend "${LLAMA_HOME}"
 fi
 
 # stable-diffusion.cpp
 STABLE_DIFFUSION_HOME="/opt/stable-diffusion-cpp"
 if [ -d "${STABLE_DIFFUSION_HOME}" ] ; then
-  export PATH="${STABLE_DIFFUSION_HOME}:${PATH}"
+  path_prepend "${STABLE_DIFFUSION_HOME}"
 fi
 
 # opencode
@@ -159,3 +173,6 @@ export HOMEBREW_NO_ANALYTICS=1
 export ASTRO_TELEMETRY_DISABLED=1
 export HF_HUB_DISABLE_TELEMETRY=1
 export WRANGLER_SEND_METRICS=false
+
+export PATH
+unset -f path_prepend

@@ -2,9 +2,9 @@
 
 This repository contains my dotfiles, which are configuration files for various applications and tools that I use on my computer.
 
-The `linux`, `mac`, `shared`, and `windows` folders contain configuration files that get symlinked to their respective locations in `$HOME`.
+The `home` and `windows` folders contain configuration files that get symlinked to their respective locations in `$HOME`.
 
-The `notes` folder contains helpful Markdown notes for provisioning a new machine.
+The `notes` folder contains helpful Markdown notes for system administration.
 
 The `bin/dotfiles` script is a single-file Python CLI with the following commands:
 
@@ -19,11 +19,11 @@ dotfiles install foundry [-f, --force]
 dotfiles install gcloud
 dotfiles install go
 dotfiles install grok [-f, --force] [-c, --channel <stable|alpha>]
+dotfiles install home
 dotfiles install neovim [-f, --force]
 dotfiles install nerdfont <font>
 dotfiles install rust
 dotfiles install solana [-f, --force]
-dotfiles install symlinks
 dotfiles install ttyd [-f, --force]
 dotfiles install uv [-f, --force]
 dotfiles install zig [-f, --force]

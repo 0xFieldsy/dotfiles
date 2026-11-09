@@ -8,8 +8,8 @@ declare -a linux_apt_python=( 'libbz2-dev' 'libffi-dev' 'liblzma-dev' 'libncurse
 declare -a linux_apt_appimage=( 'libfuse2' )
 declare -a linux_apt_chromium=( 'libnss3' )
 
-declare -a linux_bin=( 'fzf' 'lf' )
-declare -a linux_deb=( 'ajeetdsouza/zoxide' 'burntsushi/ripgrep' 'helix-editor/helix' 'lsd-rs/lsd' 'sharkdp/fd' )
+declare -a linux_bin=( 'fzf' 'lazygit' 'lf' 'micro' 'tree-sitter' )
+declare -a linux_deb=( 'ajeetdsouza/zoxide' 'burntsushi/ripgrep' 'helix-editor/helix' 'lsd-rs/lsd' 'sharkdp/bat' 'sharkdp/fd' )
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -41,7 +41,10 @@ for name in "${linux_bin[@]}" ; do
   "$script_dir/bin/dotfiles" install bin "$name"
 done
 
+# Install nvim
+"$script_dir/bin/dotfiles" install neovim
+
 # Symlink dotfiles
-"$script_dir/bin/dotfiles" install symlinks
+"$script_dir/bin/dotfiles" install home
 
 unset DEBIAN_FRONTEND

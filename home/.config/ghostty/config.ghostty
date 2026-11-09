@@ -1,11 +1,11 @@
-theme = light:GitHub Light Default,dark:GitHub Dark Default
-font-family = Maple Mono NF
-font-size = 14
+theme = light:Catppuccin Latte,dark:Catppuccin Mocha
+font-family = MonoLisa Nerd Font
+font-size = 13
 font-variation = wght=400
 font-variation-bold = wght=700
 font-variation-italic = wght=400
 font-variation-bold-italic = wght=700
-font-feature = +calt
+font-feature = ss02
 cursor-style = bar
 copy-on-select = false
 clipboard-read = allow

@@ -1,7 +1,7 @@
 -- Options are automatically loaded before lazy.nvim startup.
 -- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 
--- Use ty for types, Ruff for lint and format.
+-- Use Ty for types, Ruff for lint and format.
 vim.g.lazyvim_python_lsp = "ty"
 
 -- Force OSC 52 like Helix.
@@ -23,10 +23,11 @@ end
 -- Wrap around the end of the line like Helix.
 vim.opt.whichwrap:append("<,>,h,l,[,]")
 
--- Render whitespace like Helix.
-vim.opt.listchars = { space = "·", tab = "→ ", nbsp = "⍽" }
+-- Render boundary whitespace.
+vim.opt.list = true
+vim.opt.listchars = { tab = "  ", lead = "·", trail = "·", multispace = "·" }
 
--- Pin the background so Nvim removes its OSC 11 handler on VimEnter.
+-- Pin the background so Neovim removes its OSC 11 handler on VimEnter.
 vim.opt.background = "light"
 vim.api.nvim_create_autocmd("VimEnter", {
 	once = true,
