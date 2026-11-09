@@ -12,6 +12,7 @@ The `bin/dotfiles` script is a single-file Python CLI with the following command
 dotfiles install bin [-f, --force] <name>
 dotfiles install btop [-f, --force]
 dotfiles install claude [-c, --channel <latest|stable>]
+dotfiles install codex [-f, --force]
 dotfiles install deb [-f, --force] <org/repo>
 dotfiles install fish
 dotfiles install flyline [-f, --force]

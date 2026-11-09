@@ -21,14 +21,8 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 # Map package name to binary name.
 DEB_OVERRIDES = {"helix": "hx", "ripgrep": "rg"}
 
-# Map expected binary name to actual filename inside the archive.
-BIN_OVERRIDES = {
-    "codex": lambda arch: f"codex-{arch['musl']}",
-}
-
 BIN_REGISTRY = {
     "agent-browser": ("vercel-labs/agent-browser", lambda a: f"agent-browser-linux-{a['node']}$"),
-    "codex": ("openai/codex", lambda a: f"^codex-package-{a['musl']}\\.tar\\.gz$"),
     "duckdb": ("duckdb/duckdb", lambda a: f"duckdb_cli-linux-{a['misc']}\\.zip$"),
     "fastfetch": ("fastfetch-cli/fastfetch", lambda a: f"fastfetch-linux-{a['misc']}\\.tar\\.gz"),
     "fzf": ("junegunn/fzf", lambda a: f"fzf-.+-linux_{a['misc']}\\.tar\\.gz$"),
@@ -293,45 +287,10 @@ def cmd_install_bin(args):
         archive_path = Path(tmpdir) / filename
         _download(url, archive_path)
 
-        if name == "codex":
-            package_dir = Path(tmpdir) / "package"
-            package_dir.mkdir()
-            _extract(archive_path, package_dir)
-            manifest_path = package_dir / "codex-package.json"
-            if not manifest_path.is_file():
-                sys.exit("Codex archive has no package manifest")
-            manifest = json.loads(manifest_path.read_text())
-            version = manifest.get("version", "")
-            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-                sys.exit("Codex package has an invalid version")
-            if manifest.get("target") != arch["musl"] or manifest.get("entrypoint") != "bin/codex":
-                sys.exit("Codex package has an unexpected layout")
-            for binary in ("codex", "codex-code-mode-host"):
-                if not (package_dir / "bin" / binary).is_file():
-                    sys.exit(f"Codex package is missing {binary}")
-
-            install_root = Path("/usr/local/lib/codex")
-            install_dir = install_root / version
-            _sudo("mkdir", "-p", str(install_root))
-            if install_dir.exists():
-                _sudo("rm", "-rf", str(install_dir))
-            _sudo("mv", str(package_dir), str(install_dir))
-            for binary in ("codex", "codex-code-mode-host"):
-                _sudo("ln", "-sfn", str(install_dir / "bin" / binary), f"/usr/local/bin/{binary}")
-            for old_dir in install_root.iterdir():
-                if (
-                    old_dir.name != version
-                    and old_dir.is_dir()
-                    and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", old_dir.name)
-                ):
-                    _sudo("rm", "-rf", str(old_dir))
-            return
-
         if filename.endswith((".zip", ".tar.gz", ".tgz")):
             extract_dir = Path(tmpdir)
             _extract(archive_path, extract_dir)
-            archive_name = BIN_OVERRIDES[name](arch) if name in BIN_OVERRIDES else name
-            bin_path = _find_binary(extract_dir, archive_name)
+            bin_path = _find_binary(extract_dir, name)
             if bin_path is None:
                 sys.exit(f"Could not find {name} in archive")
             bin_path.chmod(0o755)
@@ -354,6 +313,61 @@ def cmd_install_bin(args):
         else:
             archive_path.chmod(0o755)
             _sudo("mv", str(archive_path), f"/usr/local/bin/{name}")
+
+
+# INSTALL CODEX
+def cmd_install_codex(args):
+    _require_linux()
+    arch = _detect_arch()
+
+    if not args.force and _has_cmd("codex"):
+        _log("codex already installed (use --force)")
+        return
+
+    pattern = rf"^codex-package-{arch['musl']}\.tar\.gz$"
+    release = _github_latest("openai/codex")
+    assets = release.get("assets", [])
+    match = [a for a in assets if re.search(pattern, a["name"])]
+    if not match:
+        sys.exit("Asset not found for codex")
+
+    url = match[0]["browser_download_url"]
+    filename = url.rsplit("/", 1)[-1]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive_path = Path(tmpdir) / filename
+        _download(url, archive_path)
+        package_dir = Path(tmpdir) / "package"
+        package_dir.mkdir()
+        _extract(archive_path, package_dir)
+        manifest_path = package_dir / "codex-package.json"
+        if not manifest_path.is_file():
+            sys.exit("Codex archive has no package manifest")
+        manifest = json.loads(manifest_path.read_text())
+        version = manifest.get("version", "")
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+            sys.exit("Codex package has an invalid version")
+        if manifest.get("target") != arch["musl"] or manifest.get("entrypoint") != "bin/codex":
+            sys.exit("Codex package has an unexpected layout")
+        for binary in ("codex", "codex-code-mode-host"):
+            if not (package_dir / "bin" / binary).is_file():
+                sys.exit(f"Codex package is missing {binary}")
+
+        install_root = Path("/usr/local/lib/codex")
+        install_dir = install_root / version
+        _sudo("mkdir", "-p", str(install_root))
+        if install_dir.exists():
+            _sudo("rm", "-rf", str(install_dir))
+        _sudo("mv", str(package_dir), str(install_dir))
+        for binary in ("codex", "codex-code-mode-host"):
+            _sudo("ln", "-sfn", str(install_dir / "bin" / binary), f"/usr/local/bin/{binary}")
+        for old_dir in install_root.iterdir():
+            if (
+                old_dir.name != version
+                and old_dir.is_dir()
+                and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", old_dir.name)
+            ):
+                _sudo("rm", "-rf", str(old_dir))
 
 
 # INSTALL DEB
@@ -1160,6 +1174,10 @@ def build_parser():
     p = install_sub.add_parser("claude", help="Install Claude Code via apt")
     p.add_argument("-c", "--channel", choices=CLAUDE_CHANNELS, default="latest")
     p.set_defaults(func=cmd_install_claude)
+
+    p = install_sub.add_parser("codex", help="Install Codex from GitHub releases")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_codex)
 
     p = install_sub.add_parser("deb", help="Install Debian package from GitHub releases")
     p.add_argument("repo", metavar="ORG/REPO")
