@@ -1,0 +1,263 @@
+# shellcheck shell=bash
+# Catppuccin Latte powerline prompt. Requires Bash 5, true color, and a Nerd Font.
+((BASH_VERSINFO[0] >= 5)) || return 0
+
+# Official Latte palette, as RGB triples for 24-bit SGR colors.
+__prompt_mantle='230;233;239'   # #e6e9ef
+__prompt_text='76;79;105'       # #4c4f69
+__prompt_surface0='204;208;218' # #ccd0da
+__prompt_surface1='188;192;204' # #bcc0cc
+__prompt_blue='30;102;245'      # #1e66f5
+__prompt_green='64;160;43'      # #40a02b
+__prompt_red='210;15;57'        # #d20f39
+__prompt_peach='254;100;11'     # #fe640b
+__prompt_yellow='223;142;29'    # #df8e1d
+__prompt_teal='23;146;153'      # #179299
+
+# \001 and \002 tell Readline (and flyline) which bytes are invisible.
+__prompt_reset=$'\001\e[0m\002'
+
+# Filled arrows join different backgrounds; thin dividers separate shared ones.
+__prompt_segment() {
+  local fg=$1 bg=$2 label=$3
+  if [[ $__prompt_bg == "$bg" ]]; then
+    __prompt_ps1+=$'\001\e[38;2;'"${__prompt_surface1};48;2;${bg}"$'m\002'
+  elif [[ -n $__prompt_bg ]]; then
+    __prompt_ps1+=$'\001\e[0;38;2;'"${__prompt_bg};48;2;${bg}"$'m\002'
+  fi
+  __prompt_ps1+=$'\001\e[38;2;'"${fg};48;2;${bg}"$'m\002'" ${label} "
+  __prompt_bg=$bg
+}
+
+# same as fish's `prompt_pwd`
+__prompt_pwd() {
+  local p=${PWD//[[:cntrl:]]/?} out='' rest dir
+  if [[ $p == "$HOME" ]]; then
+    p='~'
+  elif [[ $p == "$HOME"/* ]]; then
+    p="~${p#"$HOME"}"
+  fi
+  if [[ $p == */* ]]; then
+    rest=${p%/*}/
+    while [[ $rest == */* ]]; do
+      dir=${rest%%/*}
+      rest=${rest#*/}
+      if [[ $dir == .* ]]; then out+=${dir:0:2}/; else out+=${dir:0:1}/; fi
+    done
+  fi
+  __prompt_pwd_out=$out${p##*/}
+}
+
+# same as fish's `fish_git_prompt` with informative status: main ↑1↓2 +1!2?3$1
+__prompt_git() {
+  __prompt_git_out=
+
+  # find the git directory without running git, so non-repos cost nothing
+  local dir=$PWD gitdir=${GIT_DIR-} line
+  while [[ -z $gitdir ]]; do
+    if [[ -d $dir/.git ]]; then
+      gitdir=$dir/.git
+    elif [[ -f $dir/.git ]]; then
+      # worktrees and submodules have a .git file pointing to the git directory
+      { read -r line <"$dir/.git"; } 2>/dev/null
+      gitdir=${line#gitdir: }
+      [[ $gitdir == /* ]] || gitdir=$dir/$gitdir
+    elif [[ -z $dir ]]; then
+      return
+    fi
+    dir=${dir%/*}
+  done
+
+  local status_out
+  status_out=$(GIT_OPTIONAL_LOCKS=0 git status --porcelain=v2 --branch --show-stash 2>/dev/null) || return
+
+  local branch='' oid='' ahead=0 behind=0 stash=0 staged=0 conflicts=0 dirty=0 untracked=0
+  while IFS= read -r line; do
+    case $line in
+    '# branch.oid '*) oid=${line#'# branch.oid '} ;;
+    '# branch.head '*) branch=${line#'# branch.head '} ;;
+    '# branch.ab '*)
+      line=${line#'# branch.ab +'}
+      ahead=${line%% *}
+      behind=${line##*-}
+      ;;
+    '# stash '*) stash=${line#'# stash '} ;;
+    [12]' '*)
+      [[ ${line:2:1} != . ]] && ((++staged))
+      [[ ${line:3:1} != . ]] && ((++dirty))
+      ;;
+    'u '*) ((++conflicts)) ;;
+    '? '*) ((++untracked)) ;;
+    esac
+  done <<<"$status_out"
+
+  # in-progress operations, read from files like git's own git-prompt.sh does
+  local op='' step='' total=''
+  if [[ -d $gitdir/rebase-merge ]]; then
+    op=REBASE line=
+    {
+      read -r step <"$gitdir/rebase-merge/msgnum"
+      read -r total <"$gitdir/rebase-merge/end"
+      read -r line <"$gitdir/rebase-merge/head-name"
+    } 2>/dev/null
+    [[ $line == refs/heads/* ]] && branch=${line#refs/heads/}
+  elif [[ -d $gitdir/rebase-apply ]]; then
+    op=AM
+    {
+      read -r step <"$gitdir/rebase-apply/next"
+      read -r total <"$gitdir/rebase-apply/last"
+    } 2>/dev/null
+    if [[ -f $gitdir/rebase-apply/rebasing ]]; then
+      op=REBASE
+      line=
+      { read -r line <"$gitdir/rebase-apply/head-name"; } 2>/dev/null
+      [[ $line == refs/heads/* ]] && branch=${line#refs/heads/}
+    fi
+  elif [[ -f $gitdir/MERGE_HEAD ]]; then
+    op=MERGING
+  elif [[ -f $gitdir/CHERRY_PICK_HEAD ]]; then
+    op=CHERRY-PICKING
+  elif [[ -f $gitdir/REVERT_HEAD ]]; then
+    op=REVERTING
+  elif [[ -f $gitdir/BISECT_LOG ]]; then
+    op=BISECTING
+  fi
+
+  local blue=$'\001\e[38;2;'"${__prompt_blue}"$'m\002'
+  local green=$'\001\e[38;2;'"${__prompt_green}"$'m\002'
+  local peach=$'\001\e[38;2;'"${__prompt_peach}"$'m\002'
+  local red=$'\001\e[38;2;'"${__prompt_red}"$'m\002'
+  local out='󰊢 '
+  if [[ $branch == '(detached)' ]]; then
+    out+="${peach}(${oid:0:8})${blue}"
+  else
+    out+=${branch//[[:cntrl:]]/?}
+  fi
+  if [[ -n $op ]]; then
+    local operation="${op}${step:+ $step/$total}"
+    out+=" ${red}| ${operation//[[:cntrl:]]/?}${blue}"
+  fi
+  if ((ahead || behind)); then
+    out+=' '
+    ((ahead)) && out+="↑$ahead"
+    ((behind)) && out+="↓$behind"
+  fi
+  out+=' '
+  if ((staged + conflicts + dirty + untracked + stash == 0)); then
+    out+="${green}✓${blue}"
+  else
+    ((staged)) && out+="${green}+$staged"
+    ((conflicts)) && out+="${red}⨯$conflicts"
+    ((dirty)) && out+="${peach}!$dirty"
+    ((untracked)) && out+="${peach}?$untracked"
+    out+=$blue
+    ((stash)) && out+="\$$stash"
+  fi
+  __prompt_git_out=$out
+}
+
+__prompt_duration() {
+  local ms=$1
+  if ((ms < 1000)); then
+    __prompt_duration_out="${ms}ms"
+  elif ((ms < 60000)); then
+    __prompt_duration_out="$((ms / 1000)).$((ms % 1000 / 100))s"
+  elif ((ms < 3600000)); then
+    __prompt_duration_out="$((ms / 60000))m $((ms % 60000 / 1000))s"
+  else
+    __prompt_duration_out="$((ms / 3600000))h $((ms % 3600000 / 60000))m"
+  fi
+}
+
+__prompt_precmd() {
+  # Must be first, before anything changes $? or PIPESTATUS.
+  local last_status=$? pipestatus=("${PIPESTATUS[@]}") now=${EPOCHREALTIME//[^0-9]/}
+  local duration='' duration_fg=$__prompt_text codes='' failed=0
+
+  # Only show duration and exit status when PS0 recorded a command.
+  if [[ -n ${__prompt_start-} ]]; then
+    local ms=$(((now - __prompt_start) / 1000))
+    unset __prompt_start
+    if ((ms > 0)); then
+      __prompt_duration "$ms"
+      duration=$__prompt_duration_out
+      ((ms > 49)) && duration_fg=$__prompt_peach
+      ((ms > 59999)) && duration_fg=$__prompt_red
+    fi
+
+    # SIGPIPE (128 + 13) is not treated as an error.
+    if [[ $last_status != 0 && $last_status != 141 ]]; then
+      failed=1
+      local code sig sep=''
+      for code in "${pipestatus[@]}"; do
+        if ((code > 128)) && sig=$(kill -l "$((code - 128))" 2>/dev/null); then
+          code=SIG$sig
+        fi
+        codes+="$sep$code"
+        sep='|'
+      done
+      codes="[$codes]"
+      # e.g. `! true` or `set -o pipefail`.
+      ((last_status != pipestatus[-1])) && codes+=" $last_status"
+    fi
+  fi
+
+  __prompt_ps1=$__prompt_reset
+  __prompt_bg=
+
+  # Shell context occupies the same blue segment as Neovim's normal mode.
+  local context=bash context_bg=$__prompt_blue
+  if [[ -n ${SSH_TTY-}${SSH_CONNECTION-} ]]; then
+    context="${USER}@${HOSTNAME%%.*}"
+  fi
+  if ((EUID == 0)); then
+    context_bg=$__prompt_red
+    context=" $context"
+  fi
+  __prompt_segment "$__prompt_mantle" "$context_bg" "${context//[[:cntrl:]]/?}"
+
+  __prompt_git
+  if [[ -n $__prompt_git_out ]]; then
+    __prompt_segment "$__prompt_blue" "$__prompt_surface0" "$__prompt_git_out"
+  fi
+
+  __prompt_pwd
+  __prompt_segment "$__prompt_teal" "$__prompt_mantle" " $__prompt_pwd_out"
+
+  if [[ -n ${VIRTUAL_ENV-} ]]; then
+    local python=${VIRTUAL_ENV%/}
+    python=${python##*/}
+    __prompt_segment "$__prompt_yellow" "$__prompt_mantle" "󰌠 ${python//[[:cntrl:]]/?}"
+  fi
+  if [[ -n $duration ]]; then
+    __prompt_segment "$duration_fg" "$__prompt_mantle" "󰔟 $duration"
+  fi
+  ((failed)) && __prompt_segment "$__prompt_red" "$__prompt_mantle" "$codes"
+
+  # Return to the terminal background before the command line.
+  __prompt_ps1+=$'\001\e[0;38;2;'"${__prompt_bg}"$'m\002'"$__prompt_reset"$'\n'
+  local marker_color=$__prompt_green marker='❯'
+  ((failed)) && marker_color=$__prompt_red
+  ((EUID == 0)) && marker='#'
+  __prompt_ps1+=$'\001\e[38;2;'"${marker_color}"$'m\002'"${marker}${__prompt_reset} "
+}
+
+# Indirection keeps path, branch, and environment names literal during PS1 expansion.
+# shellcheck disable=SC2016
+PS1='${__prompt_ps1}'
+
+# PS0 runs after reading a command, before executing it; substring expansion emits nothing.
+__prompt_nil=
+# shellcheck disable=SC2016
+[[ ${PS0-} == *__prompt_start* ]] || PS0+='${__prompt_nil:$(( __prompt_start = ${EPOCHREALTIME//[^0-9]/}, 0 )):0}'
+
+# Run first to capture the command status. Preserve existing hooks and allow re-sourcing.
+if [[ ${PROMPT_COMMAND[*]-} != *__prompt_precmd* ]]; then
+  if [[ $(declare -p PROMPT_COMMAND 2>/dev/null) == 'declare -a '* ]]; then
+    PROMPT_COMMAND=(__prompt_precmd "${PROMPT_COMMAND[@]}")
+  else
+    # This branch handles the scalar form of PROMPT_COMMAND.
+    # shellcheck disable=SC2178,SC2128
+    PROMPT_COMMAND="__prompt_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+  fi
+fi
