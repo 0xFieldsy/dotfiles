@@ -1,0 +1,6 @@
+MD010: # hard tabs
+  code_blocks: false
+MD013: false # line length
+MD033: false # inline HTML
+MD040: false # fenced code block language
+MD041: false # top level heading

@@ -34,6 +34,12 @@ BIN_REGISTRY = {
     "fzf": ("junegunn/fzf", lambda a: f"fzf-.+-linux_{a['misc']}\\.tar\\.gz$"),
     "gh": ("cli/cli", lambda a: f"gh_.+_linux_{a['misc']}\\.tar\\.gz"),
     "gws": ("googleworkspace/cli", lambda a: f"google-workspace-cli-{a['gnu']}\\.tar\\.gz$"),
+    "lazygit": (
+        "jesseduffield/lazygit",
+        lambda a: (
+            f"lazygit_.+_linux_{'x86_64' if a['kernel'] == 'x86_64' else a['misc']}\\.tar\\.gz$"
+        ),
+    ),
     "lf": ("gokcehan/lf", lambda a: f"lf-linux-{a['misc']}\\.tar\\.gz"),
     "magick": ("imagemagick/imagemagick", lambda _: r"clang-x86_64\.AppImage$"),
     "micro": ("micro-editor/micro", lambda a: f"micro-.+-{a['micro']}\\.tar\\.gz$"),
@@ -44,6 +50,7 @@ BIN_REGISTRY = {
         "koalaman/shellcheck",
         lambda a: f"shellcheck-v.+\\.linux\\.{a['kernel']}\\.tar\\.gz$",
     ),
+    "tree-sitter": ("tree-sitter/tree-sitter", lambda a: f"^tree-sitter-linux-{a['node']}\\.gz$"),
     "xurl": (
         "xdevplatform/xurl",
         lambda a: f"xurl_Linux_{'x86_64' if a['kernel'] == 'x86_64' else a['misc']}\\.tar\\.gz$",
@@ -89,7 +96,8 @@ fastfetch \\
 --pipe false \\
 --logo none \\
 --color-keys yellow \\
---structure-disabled Title:Separator:Host:Shell:Terminal:Display:Theme:Icons:Cursor:Swap:Locale:Break:Colors
+--structure-disabled \\
+Title:Separator:Host:Shell:Terminal:Display:Theme:Icons:Cursor:Swap:Locale:Break:Colors
 """
 
 
@@ -331,10 +339,18 @@ def cmd_install_bin(args):
 
         elif filename.endswith(".bz2"):
             bin_path = Path(tmpdir) / name
-            with bz2.open(archive_path, "rb") as src, open(bin_path, "wb") as dst:
+            with bz2.BZ2File(archive_path, "rb") as src, open(bin_path, "wb") as dst:
                 shutil.copyfileobj(src, dst)
             bin_path.chmod(0o755)
             _sudo("mv", str(bin_path), f"/usr/local/bin/{name}")
+
+        elif filename.endswith(".gz"):
+            bin_path = Path(tmpdir) / name
+            with gzip.GzipFile(archive_path, "rb") as src, open(bin_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            bin_path.chmod(0o755)
+            _sudo("mv", str(bin_path), f"/usr/local/bin/{name}")
+
         else:
             archive_path.chmod(0o755)
             _sudo("mv", str(archive_path), f"/usr/local/bin/{name}")
@@ -758,6 +774,7 @@ def cmd_install_rust(args):
             f"--default-host={host}",
             "--default-toolchain=stable",
             "--profile=default",
+            "--component=rust-analyzer",
         ],
         input=installer,
         check=True,
@@ -891,6 +908,41 @@ def cmd_install_ttyd(args):
         )
         subprocess.run(["cmake", "--build", str(build_dir)], check=True)
         _sudo("cmake", "--install", str(build_dir))
+
+
+# INSTALL NEOVIM
+def cmd_install_neovim(args):
+    _require_linux()
+    arch = _detect_arch()
+
+    install_dir = Path("/usr/local/neovim")
+    if not args.force and _has_cmd("nvim"):
+        _log("neovim already installed (use --force)")
+        return
+
+    target = "x86_64" if arch["kernel"] == "x86_64" else arch["misc"]
+    asset_name = f"nvim-linux-{target}.tar.gz"
+    release = _github_latest("neovim/neovim")
+    asset = next((a for a in release.get("assets", []) if a["name"] == asset_name), None)
+    if asset is None:
+        sys.exit(f"Asset not found for neovim: {asset_name}")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        extract_dir = Path(tmpdir) / "neovim"
+        extract_dir.mkdir()
+        archive_path = Path(tmpdir) / asset_name
+        _download(asset["browser_download_url"], archive_path)
+        _extract(archive_path, extract_dir)
+
+        # The tarball contains a single directory with bin, lib, and share.
+        roots = [p for p in extract_dir.iterdir() if p.is_dir()]
+        if len(roots) != 1 or not (roots[0] / "bin" / "nvim").is_file():
+            sys.exit("Unexpected layout in neovim archive")
+
+        _sudo("rm", "-rf", str(install_dir))
+        _sudo("mv", str(roots[0]), str(install_dir))
+
+    _sudo("ln", "-sf", str(install_dir / "bin" / "nvim"), "/usr/local/bin/nvim")
 
 
 # INSTALL ZIG
@@ -1123,6 +1175,10 @@ def build_parser():
     p.add_argument("-c", "--channel", choices=GROK_CHANNELS, default="stable")
     p.add_argument("-f", "--force", action="store_true")
     p.set_defaults(func=cmd_install_grok)
+
+    p = install_sub.add_parser("neovim", help="Install Neovim into /usr/local/neovim")
+    p.add_argument("-f", "--force", action="store_true")
+    p.set_defaults(func=cmd_install_neovim)
 
     p = install_sub.add_parser("nerdfont", help="Install a Nerd Font")
     p.add_argument("name", metavar="FONT")

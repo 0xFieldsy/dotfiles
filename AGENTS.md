@@ -19,6 +19,7 @@ dotfiles install foundry [-f, --force]
 dotfiles install gcloud
 dotfiles install go
 dotfiles install grok [-f, --force] [-c, --channel <stable|alpha>]
+dotfiles install neovim [-f, --force]
 dotfiles install nerdfont <font>
 dotfiles install rust
 dotfiles install solana [-f, --force]
