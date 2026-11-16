@@ -1,8 +1,9 @@
 -- Options are automatically loaded before lazy.nvim startup.
 -- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/options.lua
 
--- Use Ty for types, Ruff for lint and format.
+-- Override language servers.
 vim.g.lazyvim_python_lsp = "ty"
+vim.g.lazyvim_ts_lsp = "tsc"
 
 -- Force OSC 52 like Helix.
 if not vim.env.TMUX and not vim.env.DISPLAY and not vim.env.WAYLAND_DISPLAY then
