@@ -137,29 +137,6 @@ export HF_DATASETS_CACHE="${XDG_CACHE_HOME}/huggingface/datasets"
 export HF_HUB_CACHE="${XDG_CACHE_HOME}/huggingface/hub"
 export HF_HUB_ENABLE_HF_TRANSFER=1
 
-# llama.cpp
-LLAMA_HOME="/opt/llama-cpp"
-if [ -d "${LLAMA_HOME}" ] ; then
-  export LLAMA_ARG_PORT=9931
-  export LLAMA_ARG_HOST='0.0.0.0'
-  export LLAMA_ARG_CORS_ORIGINS='localhost'
-  export LLAMA_ARG_FIT=0
-  export LLAMA_ARG_LOAD_MODE='dio'
-  export LLAMA_ARG_LOG_VERBOSITY=2
-  export LLAMA_ARG_TOOLS='all'
-  export LLAMA_ARG_N_GPU_LAYERS='all'
-  export LLAMA_ARG_MODELS_MAX=1
-  export LLAMA_ARG_MODELS_DIR="${HOME}/.gguf"
-  export LLAMA_ARG_MODELS_PRESET="${LLAMA_ARG_MODELS_DIR}/models.ini"
-  path_prepend "${LLAMA_HOME}"
-fi
-
-# stable-diffusion.cpp
-STABLE_DIFFUSION_HOME="/opt/stable-diffusion-cpp"
-if [ -d "${STABLE_DIFFUSION_HOME}" ] ; then
-  path_prepend "${STABLE_DIFFUSION_HOME}"
-fi
-
 # opencode
 export OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT=1
 
