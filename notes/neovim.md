@@ -4,7 +4,8 @@ The config in [`shared/.config/nvim`](../shared/.config/nvim) is built on [LazyV
 
 ## Install
 
-LazyVim needs Neovim 0.11.2 or newer. Ubuntu 24.04's `neovim` package is 0.9.5, so remove it first with `sudo apt remove -y neovim`.
+> [!NOTE]
+> LazyVim needs Neovim 0.11.2 or newer.
 
 ```sh
 dotfiles install neovim
@@ -42,6 +43,21 @@ Run `:Lazy restore` on other machines after updating `lazy-lock.json`.
 | `lua/plugins/markdown.lua` | Markdownlint configuration |
 
 The language extras are for Go, JSON, Markdown, Python, Rust, TOML, TypeScript, YAML, and Zig. `:LazyExtras` lists the rest. Add new ones as an import in `lazy.lua`.
+
+## Merging
+
+`git mergetool` opens each conflicted file with `merge.tool` set to `nvimdiff2`. The left window is `LOCAL`, the branch you have checked out. The middle window is `MERGED`, the file you write. The right window is `REMOTE`, the branch you are merging in. `BASE`, the common ancestor, stays loaded and hidden. Run the copy commands from `MERGED`. `:diffget` with no name fails in this layout because `LOCAL`, `MERGED`, and `REMOTE` are all in diff mode, so name the buffer.
+
+| Command | What it does |
+| --- | --- |
+| `]c` / `[c` | Next / previous change |
+| `:diffget LOCAL` | Take the change under the cursor from the checked-out branch |
+| `:diffget REMOTE` | Take the change under the cursor from the incoming branch |
+| `:diffget BASE` | Take the change under the cursor from the common ancestor |
+| `:wqa` | Save the merge and quit |
+| `:cq` | Quit and leave the file unmerged |
+
+A clean quit stages the file. `:buffer BASE` shows the common ancestor when you need it. Edit `MERGED` by hand for a mix of both sides, then `:diffupdate` if the highlights go stale.
 
 ## Keys
 
