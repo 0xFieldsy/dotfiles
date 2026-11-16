@@ -206,13 +206,13 @@ __prompt_precmd() {
   __prompt_bg=
 
   # Shell context occupies the same blue segment as Neovim's normal mode.
-  local context=bash context_bg=$__prompt_blue
+  # Root is the red background; the username is already in the label.
+  local context=$USER context_bg=$__prompt_blue
   if [[ -n ${SSH_TTY-}${SSH_CONNECTION-} ]]; then
     context="${USER}@${HOSTNAME%%.*}"
   fi
   if ((EUID == 0)); then
     context_bg=$__prompt_red
-    context=" $context"
   fi
   __prompt_segment "$__prompt_mantle" "$context_bg" "${context//[[:cntrl:]]/?}"
 
